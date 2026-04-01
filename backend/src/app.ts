@@ -1,5 +1,30 @@
 import express from 'express';
-import * as path from "node:path";
-const app = express();
+import helmet from "helmet";
+import morgan from "morgan";
+//引入路由
+import { authRouter } from "./routes/authRoutes";
+import { bookRouter } from "@/routes/bookRoutes";
+import { userRouter } from "@/routes/userRoutes";
+import { couponRouter } from "@/routes/couponRoutes";
+import { orderRouter } from "@/routes/orderRoutes";
+import { reviewRouter } from "@/routes/reviewRoutes";
+import { adminRouter } from "@/routes/adminRoutes";
+//中间件
+import { corsMiddleware } from "@/middleware/corsMiddleware";
+//express初始化
+export const app = express();
+app.use(helmet());
+//cors反向代理
+app.use(corsMiddleware);
+app.use(morgan("combined"));
+//格式化
+app.use(express.json());
+//注册路由
+app.use('/api/auth', authRouter);
+app.use('/api/filter', bookRouter);
+app.use('/api/user', userRouter);
+app.use('/api/coupon', couponRouter);
+app.use('/api/order', orderRouter);
+app.use('/api/review', reviewRouter);
+app.use('/api/admin', adminRouter);
 
-console.log("hello, backend placeholder");

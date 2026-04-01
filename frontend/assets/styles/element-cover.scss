@@ -1,0 +1,10 @@
+.el-overlay.is-message-box {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+.el-message-box.batch-payment-modal {
+  width: 420px;
+  border-radius: 8px;
+}

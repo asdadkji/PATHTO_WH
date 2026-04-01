@@ -6,9 +6,12 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
-      environment: 'jsdom',
+      environment: 'node',
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
+      include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+      slowTestThreshold: 1000,
+      maxConcurrency: 5,
     },
   }),
 )

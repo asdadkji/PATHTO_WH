@@ -7,22 +7,49 @@ on:
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    default:
+      run:
+        working-directory: frontend
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: echo
-        run: echo "Hello World"
-      - name: echo
-        run: echo "This is a dry run"
-      - name: echo
-        run: echo "This is a dry run"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: 部署到 Github Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: frontend/dist
 
   backend:
     runs-on: ubuntu-latest
+    default:
+      run:
+        working-directory: backend
+    permissions:
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: echo
-        run: echo "Hello World"
-      - name: echo
-        run: echo "This is a dry run"
-      - name: echo
-        run: echo "This is a dry run"
+      - name: 登录 Github Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v4
+        with:
+          context: backend
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:latest
+      - name: 通知 Render 重启
+        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
