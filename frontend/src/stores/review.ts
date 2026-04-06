@@ -85,9 +85,18 @@ export const useReviewStore = defineStore('review', () => {
     }
   }
   const addUserReview = async (data:any) => {
-    const res = await addReview(data)
-    if(res) reviews.value.push(res)
-    localstorage.set('review', reviews.value)
+    try {
+      const res = await addReview(data)
+      console.log('API响应:', res)
+      if(res) {
+        reviews.value.push(res)
+        localstorage.set('review', reviews.value)
+        return res
+      }
+    } catch (error: any) {
+      console.error('评论提交错误:', error)
+      throw error
+    }
   }
   return {
     reviews,

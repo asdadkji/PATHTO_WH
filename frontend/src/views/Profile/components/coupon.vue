@@ -47,7 +47,7 @@ onMounted(async () => {
           <div class="item__left">
             <p>{{item.merchant_name}} <span style="font-size: 12px">{{ item.coupon_type }}</span></p>
             <div>
-              <p><span style="font-size: 20px;margin-right: 4px">￥4</span><span style="font-size: 12px">{{ item.coupon_title }}</span></p>
+              <p><span style="font-size: 20px;margin-right: 4px">￥{{item.discount}}</span><span style="font-size: 12px">{{ item.coupon_title }}</span></p>
               <p style="color: #000000; font-size: 12px">{{ new Date(item.use_start).toLocaleDateString('zh-CN') }}-{{ new Date(item.use_end).toLocaleDateString('zh-CN') }}</p>
             </div>
           </div>

@@ -11,6 +11,9 @@ const bookStore = useBookStore()
 import {useOrderStore} from '@/stores/orders'
 import dayjs from "dayjs";
 const orderStore = useOrderStore()
+//引入认证仓库
+import {useAuthStore} from '@/stores/auth'
+const authStore = useAuthStore()
 const tags = ref([
   {checked:false, name:'物流很快',value:'delivery_fast'},
   {checked:false, name:'包装完好',value:'good_condition'},
@@ -69,25 +72,34 @@ const resetTags = () => {
 }
 //提交评论
 const submitForm = async () => {
-  await ruleFormRef.value?.validate()
-  const formData = {
-    order_id:props.orderId,
-    reviewer_id:1,
-    reviewed_user_id:props.sellerId,
-    role:'buyer',
-    rating:Number(ruleForm.rate),
-    comment:ruleForm.comment,
-    tags:ruleForm.selectedTags,
-    is_anonymous:true,
-    is_visible:true,
-    created_at:dayjs().format('YYYY-MM-DD HH:mm:ss'),
-    book_snapshot: {...props.book_snapshot}
+  try {
+    await ruleFormRef.value?.validate()
+    const formData = {
+      order_id:props.orderId,
+      reviewer_id:authStore.userId || 1,
+      reviewed_user_id:props.sellerId,
+      role:'buyer',
+      rating:Number(ruleForm.rate),
+      comment:ruleForm.comment,
+      tags:ruleForm.selectedTags,
+      is_anonymous:true,
+      is_visible:true,
+      created_at:dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      book_snapshot: {...props.book_snapshot}
+    }
+    console.log('提交评论数据:', formData)
+    const result = await reviewStore.addUserReview(formData)
+    console.log('评论提交结果:', result)
+    if (result) {
+      emit('confirm')
+      emit('update:visible', false)
+      resetTags()
+      ruleForm.comment = ''
+      ruleForm.rate = 4
+    }
+  } catch (error: any) {
+    console.error('评论提交失败:', error)
   }
-  console.log(formData)
-  await reviewStore.addUserReview(formData)
-/*  await orderStore.updateOrderStatus(1, props.orderId, 'buyer', 'refunded')*/
-  emit('confirm')
-  emit('update:visible', false)
 }
 //父组件操作
 interface Props {

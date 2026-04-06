@@ -166,12 +166,23 @@ const showModel = ref(false)
 const currentBookSnapshot = ref<any>({})
 const currentOrderId = ref<number>(0)
 const currentSellerId = ref<number>(0)
+//已评论订单ID列表
+const reviewedOrderIds = ref<Set<number>>(new Set())
+//检查订单是否已评论
+const isOrderReviewed = (orderId: number) => {
+  return reviewedOrderIds.value.has(orderId)
+}
 //打开子组件
 const goToComment = (row: any) => {
   currentOrderId.value = Number(row.id)
   currentBookSnapshot.value = row.book_snapshot || {}
   currentSellerId.value = Number(row.seller_id)
   showModel.value = true
+}
+//评论成功后重新获取评论列表
+const handleCommentSuccess = async () => {
+  // 将当前订单ID添加到已评论列表
+  reviewedOrderIds.value.add(currentOrderId.value)
 }
 watch(activeName, async (newVal) => {
   if (!tabLoaded.value[newVal] && newVal !== 'all') {
@@ -284,7 +295,7 @@ const goToBatchPayment = (row:any) => {
           </el-table-column>
           <el-table-column label="操作">
             <template #default="scope" style="position: relative">
-              <el-button type="primary" @click="goToComment(scope.row)" v-if="scope.row.status === 'completed'">前往评论</el-button>
+              <el-button type="primary" @click="goToComment(scope.row)" v-if="scope.row.status === 'completed' && !isOrderReviewed(scope.row.id)">前往评论</el-button>
               <el-button type="success" @click="goToBatchPayment(scope.row)" v-if="scope.row.status === 'paid'">前往付款</el-button>
             </template>
           </el-table-column>
@@ -292,7 +303,7 @@ const goToBatchPayment = (row:any) => {
         <el-pagination layout="prev, pager, next" :total="orderStore.pagination.total" style="margin-top: 16px"></el-pagination>
       </el-tab-pane>
     </el-tabs>
-    <reviews v-model:visible="showModel" :book_snapshot="currentBookSnapshot" :order-id="Number(currentOrderId)" :seller-id="currentSellerId">
+    <reviews v-model:visible="showModel" :book_snapshot="currentBookSnapshot" :order-id="Number(currentOrderId)" :seller-id="currentSellerId" @confirm="handleCommentSuccess">
       <p>您的评价已成功提交！</p>
       <p>感谢您的反馈。</p>
     </reviews>
