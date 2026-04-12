@@ -1,0 +1,49 @@
+-- auto-generated definition
+create table books
+(
+    id                  bigint unsigned auto_increment
+        primary key,
+    title               varchar(200)                                                                                                  not null comment '书名',
+    author              varchar(100)                                                                                                  not null comment '作者',
+    publisher           varchar(100)                                                                                                  not null comment '出版社',
+    isbn                varchar(20)                                                                                                   null comment 'ISBN号',
+    edition             varchar(50)                                                                                                   null comment '版次',
+    publish_year        year                                                                                                          null comment '出版年份',
+    original_price      decimal(10, 2)                                                                                                not null comment '原价',
+    price               decimal(10, 2)                                                                                                not null comment '售价',
+    book_condition      enum ('new', 'like_new', 'very_good', 'good', 'acceptable', 'poor')                                           not null comment '品相',
+    status              enum ('available', 'pending', 'sold', 'reserved', 'expired')                        default 'available'       null comment '状态',
+    category_id         bigint unsigned                                                                                               not null comment '分类ID',
+    book_type           enum ('textbook', '课外书', '考试用书', '学术专著', '文学小说', '杂志期刊', '其他') default 'textbook'        null comment '书籍类型',
+    subject             varchar(100)                                                                                                  null comment '学科/主题',
+    course_name         varchar(100)                                                                                                  null comment '课程名称',
+    tags                json                                                                                                          null comment '标签数组',
+    cover_image         varchar(500)                                                                                                  not null comment '封面图',
+    images              json                                                                                                          null comment '详情图片JSON数组',
+    description         text                                                                                                          not null comment '描述',
+    highlights          text                                                                                                          null comment '亮点描述',
+    defects             text                                                                                                          null comment '瑕疵说明',
+    transaction_methods json                                                                                                          null,
+    location            varchar(200)                                                                                                  null comment '交易地点',
+    can_deliver         tinyint(1)                                                                          default 0                 null comment '是否支持配送',
+    delivery_fee        decimal(8, 2)                                                                       default 0.00              null comment '配送费',
+    seller_id           bigint unsigned                                                                                               not null comment '卖家ID',
+    merchant_id         bigint unsigned                                                                                               not null comment '所属商家ID',
+    campus_id           bigint unsigned                                                                                               null comment '校区ID',
+    view_count          int                                                                                 default 0                 null comment '浏览数',
+    favorite_count      int                                                                                 default 0                 null comment '收藏数',
+    inquiry_count       int                                                                                 default 0                 null comment '咨询数',
+    is_featured         tinyint(1)                                                                          default 0                 null comment '是否推荐',
+    is_urgent           tinyint(1)                                                                          default 0                 null comment '是否急售',
+    is_negotiable       tinyint(1)                                                                          default 0                 null comment '价格可议',
+    featured_until      timestamp                                                                                                     null comment '推荐截止时间',
+    expires_at          timestamp                                                                                                     null comment '过期时间',
+    created_at          timestamp                                                                           default CURRENT_TIMESTAMP null,
+    updated_at          timestamp                                                                           default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    sold_at             timestamp                                                                                                     null comment '售出时间',
+    constraint fk_books_category
+        foreign key (category_id) references categories (id),
+    constraint fk_books_merchant
+        foreign key (merchant_id) references merchant (id)
+)
+    comment '书籍表';

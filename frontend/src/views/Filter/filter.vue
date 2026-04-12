@@ -16,16 +16,31 @@ const setAuthor = (author: string) => {
 
 <template>
   <top></top>
-  <div class="filter__middle">
-    <leftfilter @update:level="setCondition" @update:author="setAuthor"></leftfilter>
-    <filterbook :condition="bookCondition" :author="bookAuthor"></filterbook>
+  <div class="filter__container">
+    <div class="filter__middle">
+      <leftfilter @update:level="setCondition" @update:author="setAuthor"></leftfilter>
+      <filterbook :condition="bookCondition" :author="bookAuthor"></filterbook>
+    </div>
   </div>
 </template>
 
 <style scoped lang="scss">
+.filter__container {
+  padding: 20px 0;
+  background-color: #f8f9fa;
+}
+
 .filter__middle {
   display: flex;
-  width: 1000px;
+  width: 1200px;
   margin: 0 auto;
+  gap: 20px;
+  @media (max-width: 1280px) {
+    width: 90%;
+  }
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 </style>

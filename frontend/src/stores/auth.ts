@@ -25,6 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isLogin = computed(() => !!token.value)
   //商家身份认证
   const isMerchant = ref(storage.get('is_merchant') || false)
+  //卖家身份认证（持久化）
+  const isSeller = ref(storage.get('is_seller') || false)
   //解析token
   const myJwtDecode = (token: string | null):MyJwtPayload | null => {
     if(!token) return null
@@ -43,10 +45,18 @@ export const useAuthStore = defineStore('auth', () => {
   const isMaxAdmin = computed(() => decodedToken.value?.role === 'maxAdmin')
   const userId = computed(() => decodedToken.value?.userId)
 
-  const isSeller = asyncComputed(async () => {
-    if (!userId.value) return false
-    return await isMerchant2(userId.value)
-  })
+  // 验证并更新卖家身份
+  const verifySellerStatus = async () => {
+    if (!userId.value) {
+      isSeller.value = false
+      storage.set('is_seller', false)
+      return false
+    }
+    const status = await isMerchant2(userId.value)
+    isSeller.value = status
+    storage.set('is_seller', status)
+    return status
+  }
 
   //登录
   const loginAction = async (p:any) => {
@@ -55,6 +65,8 @@ export const useAuthStore = defineStore('auth', () => {
     storage.set('user', res.user)
     user.value = res.user;
     localStorage.setItem('token', token.value)
+    // 验证卖家身份
+    await verifySellerStatus()
     cartStore.switchUser(String(userId))
   }
   //注册
@@ -76,6 +88,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('token')
     storage.remove('user')
     storage.remove('is_merchant')
+    storage.remove('is_seller')
+    isSeller.value = false
     cartStore.logout()
   }
   //商家登录
@@ -113,6 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
     beforeResetPwdAction,
     getRedirectPath,
     isSeller,
-    decodedToken
+    decodedToken,
+    verifySellerStatus
   }
 })

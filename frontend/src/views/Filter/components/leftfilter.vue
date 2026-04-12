@@ -47,23 +47,35 @@ const handleSelect_author = (id:number) => {
 <template>
   <div class="leftfilter__container">
     <!--品相筛选-->
-    <div class="leftfilter__item" style="margin-bottom: 8px;border-bottom: 1px solid #e0e0e0;padding-bottom: 8px">
-      <span class="leftfilter__title">品相</span>
-      <ul class="leftfilter__type">
-        <li v-for="(type,idx) in typeList" :key="idx" :class="{active: idx === selectedIndex}" @click="handleSelect(idx)">
+    <div class="leftfilter__item">
+      <div class="leftfilter__header">
+        <h3 class="leftfilter__title">品相</h3>
+      </div>
+      <ul class="leftfilter__list">
+        <li 
+          v-for="(type,idx) in typeList" 
+          :key="idx" 
+          :class="{active: idx === selectedIndex}" 
+          @click="handleSelect(idx)"
+          class="leftfilter__item"
+        >
           {{type.name}}
         </li>
       </ul>
     </div>
     <!--作者筛选-->
     <div class="leftfilter__item">
-      <span class="leftfilter__title">作者专栏<span style="margin-left: 24px;color:red;cursor: pointer" @click="$emit('update:author', '');isShowAuthor=false">重置</span></span>
-      <ul class="leftfilter__type">
+      <div class="leftfilter__header">
+        <h3 class="leftfilter__title">作者专栏</h3>
+        <span class="leftfilter__reset" @click="$emit('update:author', '');isShowAuthor=false">重置</span>
+      </div>
+      <ul class="leftfilter__list">
         <li
           v-for="author in authorList"
           :key="author.id"
           :class="{active: author.id === selectedIndex_author && isShowAuthor}"
           @click="handleSelect_author(author.id)"
+          class="leftfilter__item"
         >
           {{author.name}}
         </li>
@@ -74,31 +86,62 @@ const handleSelect_author = (id:number) => {
 
 <style scoped lang="scss">
 .leftfilter__container {
-  padding: 8px 4px;
-  background-color: #f1f1f1;
-  display: flex;
-  flex-direction: column;
-  max-width: 200px;
-  width: 160px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  width: 240px;
+  transition: all 0.3s ease;
+  &:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
   .leftfilter__item {
-    display: flex;
-    flex-direction: column;
-    .leftfilter__title {
-      font-size: 14px;
-      font-weight: bold;
-    }
-    .leftfilter__type {
-      li {
-        margin-left: 8px;
-        &:hover {
-          color: #ff6700;
-          cursor: pointer;
-        }
-      }
+    margin-bottom: 24px;
+    &:last-child {
+      margin-bottom: 0;
     }
   }
-}
-.active {
-  color: #ff6700;
+  .leftfilter__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .leftfilter__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333333;
+    margin: 0;
+  }
+  .leftfilter__reset {
+    font-size: 14px;
+    color: #666666;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    &:hover {
+      color: #ff4b60;
+    }
+  }
+  .leftfilter__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .leftfilter__item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 8px;
+    &:hover {
+      background-color: #f8f9fa;
+      color: #ff4b60;
+    }
+    &.active {
+      background-color: #ffebee;
+      color: #ff4b60;
+      font-weight: 500;
+    }
+  }
 }
 </style>

@@ -145,9 +145,13 @@ export const useOrderStore = defineStore('order', () => {
   const createOrder = async (userId: number, params: CreateOrderParams) => {
     try {
       const res = await createUserOrder(userId, params)
-      if (res) orders.value.unshift(res)
+      if (res) {
+        orders.value.unshift(res)
+        return res
+      }
     } catch (e) {
       console.log('创建订单失败', e)
+      throw e
     }
   }
   //获取用户订单列表
@@ -490,6 +494,7 @@ export const useOrderStore = defineStore('order', () => {
     deliveryOrders,
     deliveryPagination,
     orderStatistics,
+    createOrder,
     getUserOrdersList,
     shipSellerOrderApi,
     receiveOrderApi,

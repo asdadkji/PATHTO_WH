@@ -93,6 +93,12 @@ const handleViewDetail = (order:any) => {
   orderDetail.value = order
   showDetail.value = true
 }
+
+// 检查订单是否为线下交易
+const isOfflineTradeOrder = (order: any) => {
+  return order.transaction_method && order.transaction_method.includes('offline')
+}
+
 watch(()=>orderStore.orders,(newVal)=>{
   console.log(newVal)
   // 当订单数据更新时，获取相关用户信息
@@ -114,7 +120,10 @@ watch(()=>orderStore.orders,(newVal)=>{
         <el-table :data="getTabData(tab.name)" style="width: 100%">
           <el-table-column label="订单号" min-width="180">
             <template #default="scope">
-              <span>{{ scope.row.order_number}}</span>
+              <div>
+                <span>{{ scope.row.order_number}}</span>
+                <el-tag v-if="isOfflineTradeOrder(scope.row)" type="warning" size="small" style="margin-left: 10px">线下交易</el-tag>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="图书信息" min-width="200">

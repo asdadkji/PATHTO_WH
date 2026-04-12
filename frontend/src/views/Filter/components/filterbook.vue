@@ -70,110 +70,223 @@ const goToBookDetail = (bookId:number) => {
   <!--筛选容器-->
   <div class="filterbook">
     <!--筛选条件-->
-    <div style="padding: 4px;display: flex;flex-direction: row;background: #e1cccc;justify-content: space-between;align-items: center">
-      <ul class="filter__top">
+    <div class="filter__header">
+      <ul class="filter__sort">
         <li @click="isNew=!isNew;isPrice=!isPrice" :class="{active:isNew}">上架时间</li>
         <li @click="isPrice=!isPrice;isNew=!isNew" :class="{active:isPrice}">价格</li>
       </ul>
-      <el-icon @click="isOrder=!isOrder" v-show="isOrder" style="cursor:pointer;"><CaretTop /></el-icon>
-      <el-icon @click="isOrder=!isOrder" v-show="!isOrder" style="cursor:pointer;"><CaretBottom /></el-icon>
+      <div class="filter__order">
+        <el-icon @click="isOrder=!isOrder" v-show="isOrder" class="filter__icon"><CaretTop /></el-icon>
+        <el-icon @click="isOrder=!isOrder" v-show="!isOrder" class="filter__icon"><CaretBottom /></el-icon>
+      </div>
     </div>
     <!--筛选后内容-->
     <div class="filter__book">
       <div class="filter__book_item" v-for="item in processedBooks" :key="item.id">
-        <img class="item_left" src="@assets/images/logo/auth-logo.svg">
-        <div class="item_middle">
-          <p style="margin-bottom: 8px; font-size: 22px;cursor: pointer" @click="goToBookDetail(item.id)">{{ item.title }}</p>
-          <p>{{ item.author }}</p>
-          <p>{{ item.publisher }}</p>
+        <div class="book__image">
+          <img :src="`https://picsum.photos/600/400?random=${item.id}`" :alt="item.title">
         </div>
-        <div class="item_right">
-          <div class="item_right_top">
-            <span>{{ item.conditionDisplay }}</span>
-            <span>￥ {{ item.price }}</span>
+        <div class="book__info">
+          <h3 class="book__title" @click="goToBookDetail(item.id)">{{ item.title }}</h3>
+          <p class="book__author">{{ item.author }}</p>
+          <p class="book__publisher">{{ item.publisher }}</p>
+        </div>
+        <div class="book__actions">
+          <div class="book__price">
+            <span class="book__condition">{{ item.conditionDisplay }}</span>
+            <span class="book__value">￥{{ item.price }}</span>
           </div>
-          <p style="display: flex;justify-content: flex-end">上书时间 {{ new Date(item.created_at).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'}) }}</p>
-          <div class="filter__btn">
-            <el-button plain style="padding: 4px 8px;">立刻购买</el-button>
-            <el-button plain style="padding: 4px 8px;">加入购物车</el-button>
-          </div>
+          <p class="book__time">上书时间 {{ new Date(item.created_at).toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'}) }}</p>
         </div>
       </div>
       <!--分页-->
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        layout="prev, pager, next, jumper"
-        background
-        :total="bookStore.totalF"
-        style="margin-top: 16px;"
-        :size="'large'"
-      />
+      <div class="filter__pagination">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          layout="prev, pager, next, jumper"
+          background
+          :total="bookStore.totalF"
+          :size="'large'"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .filterbook {
-  width: 950px;
-  .filter__top {
-    padding: 4px;
+  flex: 1;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  &:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+  .filter__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+  }
+  .filter__sort {
     display: flex;
     flex-direction: row;
-    background: #e1cccc;
+    list-style: none;
+    padding: 0;
+    margin: 0;
     li {
-      margin-right: 16px;
-      padding: 4px;
+      margin-right: 24px;
+      padding: 8px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
       &:hover {
-        background: #e4dfdf;
-        cursor: pointer;
+        background-color: #e9ecef;
       }
+      &.active {
+        background-color: #ff4b60;
+        color: #ffffff;
+      }
+    }
+  }
+  .filter__order {
+    display: flex;
+    align-items: center;
+  }
+  .filter__icon {
+    cursor: pointer;
+    font-size: 18px;
+    color: #666666;
+    transition: color 0.3s ease;
+    &:hover {
+      color: #ff4b60;
     }
   }
   .filter__book {
+    padding: 24px;
+  }
+  .filter__book_item {
+    display: flex;
+    flex-direction: row;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+  }
+  .book__image {
+    width: 120px;
+    height: 160px;
+    margin-right: 20px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+  .book__info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .book__title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333333;
+    margin: 0 0 12px 0;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    &:hover {
+      color: #ff4b60;
+    }
+  }
+  .book__author {
+    font-size: 14px;
+    color: #666666;
+    margin: 0 0 8px 0;
+  }
+  .book__publisher {
+    font-size: 14px;
+    color: #999999;
+    margin: 0;
+  }
+  .book__actions {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .book__price {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-bottom: 8px;
+  }
+  .book__condition {
+    font-size: 12px;
+    color: #666666;
+    margin-bottom: 4px;
+  }
+  .book__value {
+    font-size: 20px;
+    font-weight: 600;
+    color: #ff4b60;
+  }
+  .book__time {
+    font-size: 12px;
+    color: #999999;
+    margin: 8px 0;
+  }
+  .book__buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .book__btn {
     padding: 8px 16px;
-    .filter__book_item {
-      border-bottom: 1px solid #e4dfdf;
-      padding: 16px 0;
-      display: flex;
-      flex-direction: row;
-      .item_left {
-        width: 160px;
-        height: 160px;
-        margin-right: 16px;
-        border: 1px solid #e4dfdf;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    &.buy {
+      background-color: #ff4b60;
+      border-color: #ff4b60;
+      &:hover {
+        background-color: #ff3048;
+        border-color: #ff3048;
       }
-      .item_middle {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: flex-start;
-        flex:4;
-        p {
-          margin-bottom: 8px;
-          font-size: 14px;
-        }
-      }
-      .item_right {
-        flex:1.5;
-        .item_right_top {
-          display: flex;
-          flex-direction: row;
-          justify-content: space-between;
-          margin-bottom: 8px;
-        }
-        .filter__btn {
-          display: flex;
-          flex-direction: row;
-          justify-content: space-between;
-          margin-top: 60px;
-        }
+    }
+    &.cart {
+      &:hover {
+        border-color: #ff4b60;
+        color: #ff4b60;
       }
     }
   }
+  .filter__pagination {
+    margin-top: 32px;
+    display: flex;
+    justify-content: center;
+  }
 }
-.filter__top li.active{
-  color: #FF4B60;
-}
-
 </style>

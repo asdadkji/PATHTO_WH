@@ -125,14 +125,20 @@ router.beforeEach(async (to,from,next) => {
     // 平台商家权限检查
     if (to.meta.requireSeller) {
       console.log('router.beforeEach - 需要商家权限', authStore.isSeller)
-      // 等待isSeller计算完成
-      const isSellerValue = await authStore.isSeller
-      if (isSellerValue) {
+      // 如果本地存储的isSeller为false，验证一下卖家身份
+      if (!authStore.isSeller) {
+        console.log('router.beforeEach - 本地存储的卖家身份为false，验证卖家身份')
+        const isSellerValue = await authStore.verifySellerStatus()
+        if (isSellerValue) {
+          console.log('router.beforeEach - 商家权限验证通过')
+          next()
+        } else {
+          console.log('router.beforeEach - 商家权限验证失败，跳转到认证页面')
+          next('/auth/sellerAuth')
+        }
+      } else {
         console.log('router.beforeEach - 商家权限验证通过')
         next()
-      } else {
-        console.log('router.beforeEach - 商家权限验证失败，跳转到认证页面')
-        next('/auth/sellerAuth')
       }
       return
     }

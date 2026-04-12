@@ -10,6 +10,13 @@ const formInline = reactive({
 //引入订单仓库
 import { useOrderStore } from '@/stores/orders.ts'
 const orderStore = useOrderStore()
+//引入用户仓库
+import { useAuthStore } from '@/stores/auth.ts'
+const authStore = useAuthStore()
+//引入ElMessage
+import {ElMessage} from 'element-plus'
+//引入本地存储工具
+import storage from "@/utils/localstorage.ts";
 //tab配置
 const tabs = ref([
   {label:'全部',name:'all'},
@@ -21,21 +28,41 @@ const tabs = ref([
 ])
 const activeName = ref("all")
 const handleClick = (tab: TabsPaneContext) => {
-  orderStore.getUserOrdersList(1,'seller',1,10,tab.paneName as string)
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,tab.paneName as string)
 }
 //订单列表初始化
-onMounted(() => {
-  orderStore.getUserOrdersList(1,'seller',1,10,'all')
+onMounted(async () => {
+  // 确保authStore已初始化
+  if (!authStore.userId) {
+    // 等待authStore初始化
+    await new Promise(resolve => {
+      const unsubscribe = watch(() => authStore.userId, (newUserId) => {
+        if (newUserId) {
+          unsubscribe()
+          resolve(undefined)
+        }
+      })
+    })
+  }
+  // 获取全部订单
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'all')
+  // 预加载其他状态的订单
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'pending')
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'confirmed')
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'paid')
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'shipped')
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'delivered')
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'completed')
 })
 //具体订单类容
 const orderData = computed(()=>({
-  all:orderStore?.deliveryOrders,
-  pending:orderStore?.pendingOrders,
-  confirmed:orderStore?.confirmedOrders,
-  paid:orderStore?.paidOrders,
-  shipped:orderStore?.shippedOrders,
-  delivered:orderStore?.deliveredOrders,
-  completed:orderStore?.completedOrders,
+  all:orderStore?.allOrdersList,
+  pending:orderStore?.pendingOrdersList,
+  confirmed:orderStore?.confirmedOrdersList,
+  paid:orderStore?.paidOrdersList,
+  shipped:orderStore?.shippedOrdersList,
+  delivered:orderStore?.deliveredOrdersList,
+  completed:orderStore?.completedOrdersList,
 }))
 //订单、tab映射
 const getTabData = (tabName:string) => {
@@ -44,6 +71,51 @@ const getTabData = (tabName:string) => {
 const handleShip = (orderId:number) => {
   orderStore.shipSellerOrderApi(1,Number(orderId),'顺丰',123456)
 }
+
+// 线下交易相关
+// 从本地存储读取初始值
+const offlineTradeEnabled = ref(storage.get('offline_trade_enabled') || false)
+const locationInput = ref(storage.get('offline_trade_location') || '')
+const locationUpdateCount = ref(storage.get('offline_trade_location_update_count') || 0)
+const maxLocationUpdates = 3
+
+// 监听值变化，保存到本地存储
+watch(offlineTradeEnabled, (newValue) => {
+  storage.set('offline_trade_enabled', newValue)
+})
+
+watch(locationInput, (newValue) => {
+  storage.set('offline_trade_location', newValue)
+})
+
+watch(locationUpdateCount, (newValue) => {
+  storage.set('offline_trade_location_update_count', newValue)
+})
+
+// 检查订单是否为线下交易
+const isOfflineTradeOrder = (order: any) => {
+  return order.transaction_method && order.transaction_method.includes('offline')
+}
+
+// 确认线下交易完成
+const confirmOfflineTrade = (orderId: number) => {
+  // 这里应该调用API更新订单状态
+  ElMessage.success('线下交易已标记为完成')
+  // 刷新订单列表
+  orderStore.getUserOrdersList(1,'seller',1,10,activeName.value)
+}
+
+// 处理交易地点修改
+const handleLocationChange = () => {
+  if (locationUpdateCount.value >= maxLocationUpdates) {
+    ElMessage.warning('交易地点每年最多修改3次')
+    return
+  }
+  // 这里应该调用API保存交易地点
+  locationUpdateCount.value++
+  ElMessage.success('交易地点已更新')
+}
+
 watch(()=>orderStore.orders,(newVal)=>{
   console.log(newVal)
 })
@@ -51,6 +123,21 @@ watch(()=>orderStore.orders,(newVal)=>{
 
 <template>
   <div class="filter__order">
+    <!-- 线下交易设置 -->
+    <div class="offline-trade-settings">
+      <h3>线下交易设置</h3>
+      <div class="setting-item">
+        <span>支持线下交易：</span>
+        <el-switch v-model="offlineTradeEnabled" />
+      </div>
+      <div class="setting-item" v-if="offlineTradeEnabled">
+        <span>交易地点：</span>
+        <el-input v-model="locationInput" placeholder="请输入交易地点" style="width: 300px" />
+        <el-button type="primary" @click="handleLocationChange" style="margin-left: 10px">保存</el-button>
+        <span class="location-update-hint">交易地点每年可修改3次（已修改{{ locationUpdateCount }}次）</span>
+      </div>
+    </div>
+    
     <el-tabs v-model="activeName" @tab-click="handleClick">
       <el-tab-pane v-for="tab in tabs" :key="tab.name" :label="tab.label" :name="tab.name">
         <el-table :data="getTabData(tab.name)" style="width: 100%">
@@ -62,7 +149,10 @@ watch(()=>orderStore.orders,(newVal)=>{
           </el-table-column>
           <el-table-column label="图书名称">
             <template #default="scope">
-              <span style="font-weight: bold">{{ scope.row.book_snapshot?.title }}</span>
+              <div>
+                <span style="font-weight: bold">{{ scope.row.book_snapshot?.title }}</span>
+                <el-tag v-if="isOfflineTradeOrder(scope.row)" type="warning" size="small" style="margin-left: 10px">线下交易</el-tag>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="图书价格">
@@ -83,10 +173,18 @@ watch(()=>orderStore.orders,(newVal)=>{
               <el-button
                 type="primary"
                 @click="handleShip(scope.row.id)"
-                v-show="scope.row.status === 'paid' && scope.row.payment_status === 'paid'"
+                v-show="!isOfflineTradeOrder(scope.row) && scope.row.status === 'paid' && scope.row.payment_status === 'paid'"
                 link
               >
                 发货
+              </el-button>
+              <el-button
+                type="success"
+                @click="confirmOfflineTrade(scope.row.id)"
+                v-show="isOfflineTradeOrder(scope.row) && scope.row.status === 'confirmed'"
+                link
+              >
+                确认交易完成
               </el-button>
             </template>
           </el-table-column>
@@ -102,5 +200,31 @@ watch(()=>orderStore.orders,(newVal)=>{
   border-radius: 4px;
   background-color: #fff9f9;
   padding: 16px 8px;
+}
+
+.offline-trade-settings {
+  background-color: #f8f9fa;
+  padding: 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #333;
+  }
+  .setting-item {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    span {
+      margin-right: 10px;
+      min-width: 80px;
+    }
+  }
+  .location-update-hint {
+    margin-left: 10px;
+    font-size: 12px;
+    color: #666;
+  }
 }
 </style>
