@@ -80,5 +80,15 @@ export const BookService = {
         } catch (e) {
             console.log('获取失败',e)
         }
+    },
+    //更新商家图书的线下交易设置
+    async updateMerchantOfflineTrade(merchantId: number, enabled: boolean) {
+        try {
+            const result = await BookModel.updateMerchantOfflineTrade(merchantId, enabled);
+            return result;
+        } catch (e) {
+            console.log('更新线下交易设置失败', e);
+            throw e;
+        }
     }
 }

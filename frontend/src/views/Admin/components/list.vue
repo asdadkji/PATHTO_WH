@@ -49,24 +49,16 @@ const authStore = useAuthStore()
               <el-menu-item-group title="平台用户管理">
                 <el-menu-item index="/admin/users">管理层详情</el-menu-item>
                 <el-menu-item index="/admin/sellers">商家详情</el-menu-item>
+                <el-menu-item index="/admin/buyers">买家详情</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>
             <el-sub-menu index="3">
               <template #title>
                 <el-icon><document /></el-icon>
-                <span>安全日志</span>
+                <span>图书审查</span>
               </template>
-              <el-menu-item-group title="日志">
-                <el-menu-item index="/admin/security">管理员操作日志</el-menu-item>
-              </el-menu-item-group>
-            </el-sub-menu>
-            <el-sub-menu index="4">
-              <template #title>
-                <el-icon><setting /></el-icon>
-                <span>设置</span>
-              </template>
-              <el-menu-item-group title="设置">
-                <el-menu-item index="/admin/setting">平台设置</el-menu-item>
+              <el-menu-item-group title="审查">
+                <el-menu-item index="/admin/bookReview">图书审查</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>
             <el-sub-menu index="5">
@@ -84,7 +76,7 @@ const authStore = useAuthStore()
                 <span>订单管理</span>
               </template>
               <el-menu-item-group title="订单操作">
-                <el-menu-item index="/admin/orders">订单管理</el-menu-item>
+                <el-menu-item index="/admin/ordersA">订单管理</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>
           </el-menu>

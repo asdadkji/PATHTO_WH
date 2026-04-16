@@ -9,6 +9,7 @@ import { couponRouter } from "@/routes/couponRoutes";
 import { orderRouter } from "@/routes/orderRoutes";
 import { reviewRouter } from "@/routes/reviewRoutes";
 import { adminRouter } from "@/routes/adminRoutes";
+import { sellerRouter } from "@/routes/sellerRoutes";
 //中间件
 import { corsMiddleware } from "@/middleware/corsMiddleware";
 //express初始化
@@ -27,4 +28,9 @@ app.use('/api/coupon', couponRouter);
 app.use('/api/order', orderRouter);
 app.use('/api/review', reviewRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/seller', sellerRouter);
+
+// 启动定时任务
+import { startTasks } from './tasks';
+startTasks();
 

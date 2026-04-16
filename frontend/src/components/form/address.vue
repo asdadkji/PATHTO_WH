@@ -3,13 +3,19 @@ import {computed, onMounted, reactive, ref, watch} from "vue";
 import type {FormRules} from "element-plus";
 import type {updateAddress} from "@/types/store/address.ts";
 import {cloneDeep, isEqual} from "lodash-es";
+//引入用户仓库
+import {useAuthStore} from "@/stores/auth.ts";
+const authStore = useAuthStore()
+//引入地址仓库
+import {useAddressStore} from '@/stores/address.ts'
+const addressStore = useAddressStore()
 //表单数据类型
 interface RuleForm extends updateAddress{
   school: string
 }
 //表单数据
 const ruleForm = reactive<Omit<RuleForm, 'id'>>({
-  userId: 0,
+  userId: authStore.userId || 0,
   username: '',
   phone: 0,
   school: '金陵科技学院',
@@ -29,9 +35,6 @@ const rules = reactive<FormRules<RuleForm>>({
     {required: true, message: '请输入地址', trigger: 'blur'},
   ],
 })
-//引入地址仓库
-import {useAddressStore} from '@/stores/address.ts'
-const addressStore = useAddressStore()
 //emit
 const emit = defineEmits(['close','submit'])
 //关闭表单
@@ -40,9 +43,6 @@ const closeAddress = () => {
 }
 //判定是否默认地址
 const isDefault = ref(false)
-//引入用户仓库
-import {useAuthStore} from "@/stores/auth.ts";
-const authStore = useAuthStore()
 //props
 const props = withDefaults(defineProps<{
   originalData?: updateAddress | null
@@ -64,7 +64,7 @@ const initializeForm = () => {
     /*isDefault.value = props.originalData?.isDefault ?? false*/
   } else {
     Object.assign(ruleForm,{
-      userId:0,
+      userId:authStore.userId || 0,
       username:'',
       phone:0,
       address:'',
@@ -99,14 +99,15 @@ const hasChanges = computed(() => {
 })
 //触发父组件提交表单
 const submit = () => {
+  const userId = authStore.userId || 1
   const addressData = {
-    userId: 1, /*authStore.user.id*/
+    userId: userId,
     username: ruleForm.username,
     phone: ruleForm.phone,
     address: ruleForm.address,
     isDefault: ruleForm.isDefault
   }
-  const finalData = props.mode === 'edit' ? {id: props.originalData?.id,...getChangeFields(),userId:1} : addressData
+  const finalData = props.mode === 'edit' ? {id: props.originalData?.id,...getChangeFields(),userId:userId} : addressData
   emit('submit',finalData)
   /*addressStore.addAddress(addressData)*/
   closeAddress()

@@ -6,6 +6,8 @@ export interface UserRow extends RowDataPacket {
     id: number;
     username: string;
     password_hash: string;
+    is_banned: boolean;
+    role: string;
 }
 export const AuthModel = {
     async create(u:{ username:string; password_hash:string, phone:number }){
@@ -31,6 +33,12 @@ export const AuthModel = {
     async existByUserId(userId:number){
         const [rows] = await pool.query('SELECT id FROM merchant WHERE user_id = ?', [userId]);
         return (rows as any[]).length > 0
+    },
+    
+    //根据用户ID获取商家ID
+    async getMerchantIdByUserId(userId:number){
+        const [rows] = await pool.query('SELECT id FROM merchant WHERE user_id = ?', [userId]);
+        return (rows as any[])[0]?.id || null
     },
     //重置密码前置验证
     async checkAccount(username:string,phone:number){

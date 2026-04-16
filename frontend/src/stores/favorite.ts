@@ -24,23 +24,23 @@ const write = (key: string, value: any) => {
 
 export const useFavoriteStore = defineStore('favorite', ()=>{
   const favoriteList = ref<Favorite[]>(read(FAVORITE_KEY, []))
-  // 已收藏的ID集合（用于快速判断）
-  const favoritedIds = ref<Set<number>>(new Set(read(FAVORITED_IDS_KEY, [])))
+  // 已收藏的ID数组（用于快速判断）
+  const favoritedIds = ref<number[]>(read(FAVORITED_IDS_KEY, []))
   const deleteFavorite = (id:number)=>{
     favoriteList.value = favoriteList.value.filter(i=>i.id !== id)
-    favoritedIds.value.delete(id)
+    favoritedIds.value = favoritedIds.value.filter(item => item !== id)
   }
   //添加收藏
   const addFavoriteList = (data:Favorite) => {
-    if (!favoritedIds.value.has(data.id)) {
+    if (!favoritedIds.value.includes(data.id)) {
       favoriteList.value.push(data)
-      favoritedIds.value.add(data.id)
+      favoritedIds.value.push(data.id)
     }
   }
 
   // 判断是否已收藏
   const isFavorited = (id: number): boolean => {
-    return favoritedIds.value.has(id)
+    return favoritedIds.value.includes(id)
   }
 
   // 切换收藏状态
@@ -63,14 +63,14 @@ export const useFavoriteStore = defineStore('favorite', ()=>{
   watch(
     favoritedIds,
     (newIds) => {
-      write(FAVORITED_IDS_KEY, [...newIds])
+      write(FAVORITED_IDS_KEY, newIds)
     },
     { deep: true }
   )
 
   return {
     favoriteList,
-    favoritedIds: computed(() => [...favoritedIds.value]), // 对外暴露为数组
+    favoritedIds,
     deleteFavorite,
     addFavoriteList,
     isFavorited,

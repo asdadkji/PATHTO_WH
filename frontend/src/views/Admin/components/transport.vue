@@ -6,8 +6,12 @@ import {useOrderStore} from "@/stores/orders.ts";
 const orderStore = useOrderStore()
 //引入后台仓库
 import {useAdminStore} from "@/stores/admin.ts";
+import {useAuthStore} from "@/stores/auth.ts";
+import {useAddressStore} from "@/stores/address.ts";
 import dayjs from "dayjs";
 const adminStore = useAdminStore()
+const authStore = useAuthStore()
+const addressStore = useAddressStore()
 const source = ref(0)
 const outputValue = useTransition(source, {
   duration: 1500,
@@ -34,14 +38,25 @@ watch(()=>adminStore.deliveryOrders, (newVal) => {
   console.log(newVal)
 })
 //确认送达
-const confirmDelivered = (orderId:number) => {
-  const markData:any = {
-    tracking_company:'顺丰',
-    tracking_number:123456,
-    delivered_time:new Date(),
-    notes:'已送达'
+const confirmDelivered = async (orderId:number) => {
+  try {
+    const markData:any = {
+      tracking_company:'顺丰',
+      tracking_number:Date.now(),
+      delivered_time:new Date(),
+      notes:'已送达'
+    }
+    // 调用API标记订单为已送达
+    const result = await orderStore.markAsDeliveredApi(authStore.userId || 1,orderId,markData,'admin')
+    console.log('确认送达结果:', result)
+    
+    // 刷新待配送订单列表
+    orderStore.getOrdersToDeliverApi('admin', {page: 1, pageSize: 10})
+    // 刷新已送达订单列表
+    adminStore.fetchOrdersToDeliver()
+  } catch (error) {
+    console.error('确认送达失败:', error)
   }
-  orderStore.markAsDeliveredApi(8,orderId,markData,'admin')
 }
 </script>
 
@@ -75,12 +90,21 @@ const confirmDelivered = (orderId:number) => {
         <span>未知的旅途等你开拓</span>
         <el-table style="width: 100%" height="715" :data="orderStore.deliveryOrders">
           <el-table-column prop="book_snapshot.title" label="书名" width="180" fixed/>
-          <el-table-column prop="addresses" label="运输地址" width="330">
+          <el-table-column label="卖家地址" width="330">
             <template #default="scope">
-              {{ scope.row.shipping_address.address }}————>{{scope.row.receiver_address}}
+              {{ scope.row.seller_address || '暂无地址信息' }}
             </template>
           </el-table-column>
-          <el-table-column prop="receiver_phone" label="收货人手机号" width="120" />
+          <el-table-column label="买家地址" width="330">
+            <template #default="scope">
+              {{ scope.row.shipping_address?.detailAddress || scope.row.shipping_address?.address || '暂无地址信息' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="收货人手机号" width="120">
+            <template #default="scope">
+              {{ scope.row.shipping_address?.phone || '暂无手机号' }}
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="80">
             <template #default="scope">
               <el-button type="primary" size="small" link @click="confirmDelivered(scope.row.id,)">确认送达</el-button>
@@ -90,12 +114,20 @@ const confirmDelivered = (orderId:number) => {
       </div>
       <div class="transport__delivered">
         <span>包裹已送达，感谢你的付出</span>
-        <el-table style="width: 100%" height="715" :data="adminStore.deliveryOrders" :default-sort="{prop:'time',order:'descending'}">
-          <el-table-column prop="book_snapshot.title" label="书名" width="140" fixed/>
-          <el-table-column prop="receiver_name" label="收货人" width="128"/>
+        <el-table style="width: 100%" height="715" :data="adminStore.deliveryOrders" :default-sort="{prop:'delivered_at',order:'descending'}">
+          <el-table-column label="书名" width="140" fixed>
+            <template #default="scope">
+              {{ scope.row.book_snapshot?.title || '未知书名' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="收货人" width="128">
+            <template #default="scope">
+              {{ scope.row.shipping_address?.username || scope.row.shipping_address?.receiver_name || scope.row.shipping_address?.name || '未知收货人' }}
+            </template>
+          </el-table-column>
           <el-table-column label="送达时间" sortable>
             <template #default="scope">
-              {{ dayjs(scope.row.shipped_at).format('YYYY-MM-DD') }}
+              {{ scope.row.delivered_at ? dayjs(scope.row.delivered_at).format('YYYY-MM-DD HH:mm:ss') : '未知时间' }}
             </template>
           </el-table-column>
         </el-table>

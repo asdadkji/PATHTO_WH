@@ -101,26 +101,46 @@ const ruleForm = reactive<RuleForm>({
 const selectCategory = ref('')
 const selectCondition = ref('')
 import {useBookStore} from "@/stores/book.ts";
+import {useAuthStore} from "@/stores/auth.ts";
+import {getMerchantId} from "@/apis/services/auth.ts";
+import { ElMessage } from "element-plus";
 const bookStore = useBookStore()
+const authStore = useAuthStore()
 //提交表单
-const submitForm = () => {
-  const formData = {
-    title:ruleForm.title,
-    highlights:ruleForm.recommend,
-    author:ruleForm.author,
-    publisher:ruleForm.publisher,
-    category_id:Number(selectCategory.value),
-    publish_year:dayjs(ruleForm.publishDate).format('YYYY'),
-    original_price:ruleForm.originalPrice,
-    book_condition:selectCondition.value,
-    description:ruleForm.description,
-    price:ruleForm.price,
-    cover_image:ruleForm.img.map(item=>item.url),
-    seller_id:1,
-    merchant_id:1,
+const submitForm = async () => {
+  try {
+    if (!authStore.userId) {
+      ElMessage.error('用户未登录');
+      return;
+    }
+    
+    if (!authStore.isSeller) {
+      ElMessage.error('您还不是商家，请先完成商家认证');
+      return;
+    }
+    
+    const merchantId = await getMerchantId(authStore.userId);
+    
+    const formData = {
+      title:ruleForm.title,
+      highlights:ruleForm.recommend,
+      author:ruleForm.author,
+      publisher:ruleForm.publisher,
+      category_id:Number(selectCategory.value),
+      publish_year:dayjs(ruleForm.publishDate).format('YYYY'),
+      original_price:ruleForm.originalPrice,
+      book_condition:selectCondition.value,
+      description:ruleForm.description,
+      price:ruleForm.price,
+      cover_image:ruleForm.img.map(item=>item.url),
+      seller_id:authStore.userId,
+      merchant_id:merchantId,
+    }
+    bookStore.listBook(formData)
+    resetForm()
+  } catch (error) {
+    ElMessage.error('获取商家信息失败，请先完成商家认证');
   }
-  bookStore.listBook(formData)
-  resetForm()
 }
 //撤回表单
 const formRef = ref<FormInstance>()

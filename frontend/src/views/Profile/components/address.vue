@@ -7,6 +7,9 @@ const addressStore = useAddressStore()
 import addresses from '@/components/form/address.vue'
 //ts
 import type{updateAddress} from "@/types/store/address.ts"
+//引入auth仓库
+import { useAuthStore } from '@/stores/auth.ts'
+const authStore = useAuthStore()
 //判定是否展示表单
 const isShowAddress = ref(false)
 //关闭表单
@@ -16,7 +19,8 @@ const handleCloseAddress = () => {
 }
 //展示地址
 onMounted(()=>{
-  addressStore.getAddressList(1)
+  const userId = authStore.userId || 1
+  addressStore.getAddressList(userId)
 })
 //两种模式
 const currentMode = ref<'create' | 'edit'>('create')

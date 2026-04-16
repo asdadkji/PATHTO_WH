@@ -100,5 +100,50 @@ export const adminService = {
         }catch (e) {
             console.log('获取已送达的图书失败',e)
         }
+    },
+    
+    //获取买家列表
+    async getBuyerListS(page: number, pageSize: number) {
+        try {
+            return await AdminModel.getBuyerList(page, pageSize)
+        }catch (e) {
+            console.log('获取买家列表失败',e)
+        }
+    },
+    
+    //获取买家详情
+    async getBuyerDetailS(buyerId: number) {
+        try {
+            return await AdminModel.getBuyerDetail(buyerId)
+        }catch (e) {
+            console.log('获取买家详情失败',e)
+        }
+    },
+    
+    //注销买家账号
+    async deleteBuyerS(buyerId: number, reason: string) {
+        try {
+            return await AdminModel.deleteBuyer(buyerId, reason)
+        }catch (e) {
+            console.log('注销买家账号失败',e)
+        }
+    },
+    
+    //封禁买家账号
+    async banBuyerS(buyerId: number, reason: string) {
+        try {
+            return await AdminModel.banBuyer(buyerId, reason)
+        }catch (e) {
+            console.log('封禁买家账号失败',e)
+        }
+    },
+    
+    //解封买家账号
+    async unbanBuyerS(buyerId: number) {
+        try {
+            return await AdminModel.unbanBuyer(buyerId)
+        }catch (e) {
+            console.log('解封买家账号失败',e)
+        }
     }
 }

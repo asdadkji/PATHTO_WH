@@ -47,3 +47,193 @@ create table books
         foreign key (merchant_id) references merchant (id)
 )
     comment '书籍表';
+
+
+    
+
+-- auto-generated definition
+create table books
+(
+    id                  bigint unsigned auto_increment
+        primary key,
+    title               varchar(200)                                                                                                  not null comment '书名',
+    author              varchar(100)                                                                                                  not null comment '作者',
+    publisher           varchar(100)                                                                                                  not null comment '出版社',
+    isbn                varchar(20)                                                                                                   null comment 'ISBN号',
+    edition             varchar(50)                                                                                                   null comment '版次',
+    publish_year        year                                                                                                          null comment '出版年份',
+    original_price      decimal(10, 2)                                                                                                not null comment '原价',
+    price               decimal(10, 2)                                                                                                not null comment '售价',
+    book_condition      enum ('new', 'like_new', 'very_good', 'good', 'acceptable', 'poor')                                           not null comment '品相',
+    status              enum ('available', 'pending', 'sold', 'reserved', 'expired')                        default 'available'       null comment '状态',
+    category_id         bigint unsigned                                                                                               not null comment '分类ID',
+    book_type           enum ('textbook', '课外书', '考试用书', '学术专著', '文学小说', '杂志期刊', '其他') default 'textbook'        null comment '书籍类型',
+    subject             varchar(100)                                                                                                  null comment '学科/主题',
+    course_name         varchar(100)                                                                                                  null comment '课程名称',
+    tags                json                                                                                                          null comment '标签数组',
+    cover_image         varchar(500)                                                                                                  not null comment '封面图',
+    images              json                                                                                                          null comment '详情图片JSON数组',
+    description         text                                                                                                          not null comment '描述',
+    highlights          text                                                                                                          null comment '亮点描述',
+    defects             text                                                                                                          null comment '瑕疵说明',
+    transaction_methods json                                                                                                          null,
+    location            varchar(200)                                                                                                  null comment '交易地点',
+    can_deliver         tinyint(1)                                                                          default 0                 null comment '是否支持配送',
+    delivery_fee        decimal(8, 2)                                                                       default 0.00              null comment '配送费',
+    seller_id           bigint unsigned                                                                                               not null comment '卖家ID',
+    merchant_id         bigint unsigned                                                                                               not null comment '所属商家ID',
+    campus_id           bigint unsigned                                                                                               null comment '校区ID',
+    view_count          int                                                                                 default 0                 null comment '浏览数',
+    favorite_count      int                                                                                 default 0                 null comment '收藏数',
+    inquiry_count       int                                                                                 default 0                 null comment '咨询数',
+    is_featured         tinyint(1)                                                                          default 0                 null comment '是否推荐',
+    is_urgent           tinyint(1)                                                                          default 0                 null comment '是否急售',
+    is_negotiable       tinyint(1)                                                                          default 0                 null comment '价格可议',
+    featured_until      timestamp                                                                                                     null comment '推荐截止时间',
+    expires_at          timestamp                                                                                                     null comment '过期时间',
+    created_at          timestamp                                                                           default CURRENT_TIMESTAMP null,
+    updated_at          timestamp                                                                           default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    sold_at             timestamp                                                                                                     null comment '售出时间',
+    review_status       enum ('pending', 'approved', 'rejected')                                            default 'pending'         not null,
+    review_result       text                                                                                                          null,
+    review_admin_id     bigint unsigned                                                                                               null,
+    reviewed_at         timestamp                                                                                                     null,
+    constraint books_ibfk_1
+        foreign key (review_admin_id) references users (id),
+    constraint fk_books_category
+        foreign key (category_id) references categories (id),
+    constraint fk_books_merchant
+        foreign key (merchant_id) references merchant (id)
+)
+    comment '书籍表';
+
+create index idx_book_type
+    on books (book_type);
+
+create index idx_campus_id
+    on books (campus_id);
+
+create index idx_category_id
+    on books (category_id);
+
+create index idx_created_at
+    on books (created_at);
+
+create index idx_is_featured
+    on books (is_featured);
+
+create index idx_merchant_id
+    on books (merchant_id);
+
+create index idx_price
+    on books (price);
+
+create fulltext index idx_search
+    on books (title, author, publisher, description);
+
+create index idx_seller_id
+    on books (seller_id);
+
+create index idx_status
+    on books (status);
+
+create index review_admin_id
+    on books (review_admin_id);
+
+
+
+
+
+-- auto-generated definition
+create table users
+(
+    id                    bigint unsigned auto_increment
+        primary key,
+    username              varchar(50)                                                                    not null comment '用户名',
+    email                 varchar(100)                                                                   null,
+    phone                 varchar(20)                                                                    null comment '手机号',
+    password_hash         varchar(255)                                                                   not null comment '密码哈希',
+    real_name             varchar(100)                                                                   null,
+    student_id            varchar(20)                                                                    null comment '学号',
+    avatar_url            varchar(500)                                                                   null comment '头像URL',
+    college               varchar(100)                                                                   null comment '学院',
+    major                 varchar(100)                                                                   null comment '专业',
+    grade                 varchar(20)                                                                    null comment '年级',
+    bio                   text                                                                           null comment '个人简介',
+    gender                enum ('male', 'female', 'unknown')                   default 'unknown'         null comment '性别',
+    signature             varchar(200)                                                                   null comment '个性签名',
+    role                  enum ('student', 'transporter', 'admin', 'maxAdmin') default 'student'         null comment '角色',
+    wechat                varchar(50)                                                                    null comment '微信号',
+    qq                    varchar(20)                                                                    null comment 'QQ号',
+    location              varchar(200)                                                                   null comment '位置信息',
+    email_verified        tinyint(1)                                           default 0                 null comment '邮箱验证',
+    phone_verified        tinyint(1)                                           default 0                 null comment '手机验证',
+    real_name_verified    tinyint(1)                                           default 0                 null comment '实名认证',
+    rating                decimal(3, 2)                                        default 5.00              null comment '用户评分',
+    total_transactions    int                                                  default 0                 null comment '总交易数',
+    positive_reviews      int                                                  default 0                 null comment '好评数',
+    negative_reviews      int                                                  default 0                 null comment '差评数',
+    has_payment_password  tinyint(1)                                           default 0                 null comment '是否设置支付密码',
+    payment_password_hash varchar(255)                                                                   null comment '支付密码哈希',
+    is_active             tinyint(1)                                           default 1                 null comment '是否激活',
+    is_banned             tinyint(1)                                           default 0                 null comment '是否封禁',
+    ban_reason            text                                                                           null comment '封禁原因',
+    ban_until             timestamp                                                                      null comment '封禁截止时间',
+    created_at            timestamp                                            default CURRENT_TIMESTAMP null,
+    updated_at            timestamp                                            default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    last_login_at         timestamp                                                                      null comment '最后登录时间',
+    constraint email
+        unique (email),
+    constraint phone
+        unique (phone),
+    constraint student_id
+        unique (student_id),
+    constraint username
+        unique (username)
+)
+    comment '用户表';
+
+create index idx_college
+    on users (college);
+
+create index idx_created_at
+    on users (created_at);
+
+create index idx_email
+    on users (email);
+
+create index idx_phone
+    on users (phone);
+
+create index idx_username
+    on users (username);    
+
+
+
+
+-- auto-generated definition
+create table merchant
+(
+    id               bigint unsigned auto_increment
+        primary key,
+    user_id          bigint unsigned                         not null comment '对应 users.id',
+    shop_name        varchar(100)                            null comment '店铺名称',
+    shop_logo        varchar(500)                            null comment '店铺 logo',
+    shop_desc        text                                    null comment '店铺简介',
+    business_license varchar(500)                            null comment '营业执照照片 URL',
+    real_name_ver_sn varchar(50)                             null comment '实名认证序列号',
+    contact_phone    varchar(20)                             null comment '商家客服电话',
+    contact_email    varchar(100)                            null comment '商家客服邮箱',
+    status           tinyint       default 0                 not null comment '0待审核 1正常营业 2平台冻结 3主动关闭 4封禁',
+    reason           text                                    null comment '审核/冻结/封禁原因',
+    created_at       timestamp     default CURRENT_TIMESTAMP null,
+    updated_at       timestamp     default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
+    book_cnt         int           default 0                 null comment '在售图书数',
+    order_cnt        int           default 0                 null comment '历史订单数',
+    rating           decimal(3, 2) default 5.00              null comment '店铺评分',
+    constraint uq_merchant_user
+        unique (user_id),
+    constraint fk_merchant_user
+        foreign key (user_id) references users (id)
+)
+    comment '商家档案';

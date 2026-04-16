@@ -26,3 +26,7 @@ export const applyForMerchant = (userId:number, realUserName:string) => {
 export const isMerchant2 = (userId:number) => {
   return service.get('/auth/isMerchant', {params: {userId}})
 }
+//获取商家ID
+export const getMerchantId = (userId:number) => {
+  return service.get('/auth/merchantId', {params: {userId}})
+}

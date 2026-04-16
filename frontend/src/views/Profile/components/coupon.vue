@@ -13,6 +13,12 @@ const value = ref(true)
 //引入优惠券仓库
 import {useCouponStore} from '@/stores/coupon'
 const couponStore = useCouponStore()
+//引入用户仓库
+import {useAuthStore} from '@/stores/auth'
+const authStore = useAuthStore()
+//引入路由
+import {useRouter} from 'vue-router'
+const router = useRouter()
 //优惠券分类列表配置
 const tabList = ref([
   {
@@ -29,17 +35,32 @@ const tabList = ref([
   }
 ])
 const activeName = ref('unused')
+//处理标签页切换
+const handleTabChange = async (tabName: string) => {
+  const userId = authStore.userId || 1
+  await couponStore.getUserCoupon({
+    userId: userId,
+    status: tabName,
+  })
+}
+
+//跳转到购物车
+const goToCart = () => {
+  router.push('/cart')
+}
+
 //优惠券初始化
 onMounted(async () => {
+  const userId = authStore.userId || 1
   await couponStore.getUserCoupon({
-    userId: 1,
+    userId: userId,
     status: 'unused',
   })
 })
 </script>
 
 <template>
-  <el-tabs type="border-card" v-model="activeName" @tab-change="couponStore.getUserCoupon({userId: 1, status: activeName})">
+  <el-tabs type="border-card" v-model="activeName" @tab-change="handleTabChange">
     <el-tab-pane v-for="item in tabList" :key="item.name" :name="item.name" :label="item.title">
       <el-empty description="description" v-if="false"/>
       <div class="coupon__list">
@@ -51,8 +72,10 @@ onMounted(async () => {
               <p style="color: #000000; font-size: 12px">{{ new Date(item.use_start).toLocaleDateString('zh-CN') }}-{{ new Date(item.use_end).toLocaleDateString('zh-CN') }}</p>
             </div>
           </div>
-          <div class="item__right">
-            <p style="writing-mode: vertical-rl">去使用</p>
+          <div class="item__right" @click="activeName === 'unused' && goToCart()" :style="{ cursor: activeName === 'unused' ? 'pointer' : 'not-allowed', opacity: activeName === 'unused' ? '1' : '0.7' }">
+            <p style="writing-mode: vertical-rl">
+              {{ activeName === 'unused' ? '去使用' : activeName === 'used' ? '已使用' : '已过期' }}
+            </p>
           </div>
         </div>
       </div>

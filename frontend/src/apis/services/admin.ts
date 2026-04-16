@@ -115,3 +115,28 @@ export const unfreezeShopApi = (adminId:number) => {
 export const getOrdersToDeliverApi = ():Promise<Order[]> => {
   return service.get('/admin/deliveredBooks')
 }
+
+//获取买家列表
+export const getBuyerListApi = (adminId:number,page:number,pageSize:number):Promise<any> => {
+  return service.get('/admin/buyerList',{params:{adminId,page,pageSize}})
+}
+
+//获取买家详情
+export const getBuyerDetailApi = (adminId:number,buyerId:number):Promise<any> => {
+  return service.get('/admin/buyerDetail',{params:{adminId,buyerId}})
+}
+
+//注销买家账号
+export const deleteBuyerApi = (adminId:number,buyerId:number,reason:string) => {
+  return service.patch('/admin/deleteBuyer', {reason},{params:{adminId,buyerId}})
+}
+
+//封禁买家账号
+export const banBuyerApi = (adminId:number,buyerId:number,reason:string) => {
+  return service.patch('/admin/banBuyer', {reason},{params:{adminId,buyerId}})
+}
+
+//解封买家账号
+export const unbanBuyerApi = (adminId:number,buyerId:number) => {
+  return service.patch('/admin/unbanBuyer',{params:{adminId,buyerId}})
+}

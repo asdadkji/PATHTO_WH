@@ -73,3 +73,18 @@ export const isMerchant = async (req: Request, res: Response) => {
         res.json({code:1, message:"认证失败"})
     }
 }
+
+export const getMerchantId = async (req: Request, res: Response) => {
+    try {
+        const {userId} = req.query;
+        if(!userId) {
+            res.json({code:1, data: null, message:"参数错误"})
+            return
+        }
+        const result = await AuthService.getMerchantId(Number(userId));
+        res.json({code:0, data:result, message:"查询成功"})
+    } catch (e) {
+        console.log('获取商家ID失败',e)
+        res.json({code:1, message:"获取商家ID失败"})
+    }
+}

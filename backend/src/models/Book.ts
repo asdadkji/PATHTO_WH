@@ -23,7 +23,7 @@ export interface BookRow extends RowDataPacket {
 export const BookModel = {
     //详情页-完整图书信息
     async getById (id:number) {
-        const [rows] = await pool.execute<BookRow[]>("SELECT b.*, m.shop_name AS merchantName,m.id AS merchantId FROM books as b LEFT JOIN merchant AS m ON m.id = b.merchant_id WHERE b.id = ? AND b.status = 'available'", [id]);
+        const [rows] = await pool.execute<BookRow[]>("SELECT b.*, m.shop_name AS merchantName,m.id AS merchantId FROM books as b LEFT JOIN merchant AS m ON m.id = b.merchant_id WHERE b.id = ? AND b.status = 'available' AND b.review_status = 'approved'", [id]);
         return rows[0] ?? null
     },
     //首页-图书列表-按部分分类展示最新10本
@@ -32,7 +32,7 @@ export const BookModel = {
         const [rows] = await pool.query<BookRow[]>(
             `SELECT b.id, b.title, b.author, b.price, b.cover_image, b.created_at, b.category_id
          FROM books b 
-         WHERE b.category_id IN (${placeholders}) AND b.status = 'available'
+         WHERE b.category_id IN (${placeholders}) AND b.status = 'available' AND b.review_status = 'approved'
          ORDER BY b.category_id, b.created_at DESC 
          LIMIT ?`,
             [...categoryIds, limit]
@@ -46,9 +46,9 @@ export const BookModel = {
         const allowSort = ['created_at','price','publish_year']
         if(!allowSort.includes(sort)) throw new Error('非法排序字段')
         //where条件
-        let where = 'WHERE status = ?'
+        let where = 'WHERE status = ? AND review_status = ?'
         //params参数
-        const params:any[] = ['available']
+        const params:any[] = ['available', 'approved']
         //搜索框筛选
         if(keyword) {
             where += ' AND MATCH(title, author, publisher, description) AGAINST(? IN NATURAL LANGUAGE MODE)';
@@ -98,8 +98,9 @@ export const BookModel = {
                    price,
                    cover_image,
                    seller_id,
-                   merchant_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
-        const [rows] = await pool.execute(sql,[bookData.title,bookData.highlights,bookData.author,bookData.publisher,bookData.category_id,bookData.publish_year,bookData.original_price,bookData.book_condition,bookData.description,bookData.price,bookData.cover_image,bookData.seller_id,bookData.merchant_id]);
+                   merchant_id,
+                   review_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+        const [rows] = await pool.execute(sql,[bookData.title,bookData.highlights,bookData.author,bookData.publisher,bookData.category_id,bookData.publish_year,bookData.original_price,bookData.book_condition,bookData.description,bookData.price,bookData.cover_image,bookData.seller_id,bookData.merchant_id,'pending']);
         return rows;
     },
     //商家下架图书
@@ -151,5 +152,12 @@ export const BookModel = {
     async getBookById(bookId:number,merchantId:number) {
         const [rows] = await pool.execute(`SELECT * FROM books WHERE id = ? AND merchant_id = ?`,[bookId,merchantId]) as [any[],any];
         return rows[0] || null;
+    },
+    //更新商家图书的线下交易设置
+    async updateMerchantOfflineTrade(merchantId: number, enabled: boolean) {
+        const transactionMethods = enabled ? JSON.stringify(['face_to_face']) : null;
+        const sql = `UPDATE books SET transaction_methods = ? WHERE merchant_id = ? AND status = 'available'`;
+        const [rows] = await pool.execute(sql, [transactionMethods, merchantId]);
+        return rows;
     }
 }

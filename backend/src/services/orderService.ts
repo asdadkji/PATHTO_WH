@@ -121,11 +121,18 @@ export const orderService = {
         const order = await OrderModel.findOrderById(orderId)
         if(!order) throw new Error('订单不存在')
         const oldStatus = toEnum(order.status)
-        if(!TRANSITION_RULES[oldStatus]?.includes(newStatus)) {
+        
+        // 对于线下交易的订单，允许直接从任何状态转换为completed状态
+        if(order.transaction_method !== 'face_to_face' && !TRANSITION_RULES[oldStatus]?.includes(newStatus)) {
             throw new Error('订单状态更新失败')
         }
-        //鉴权
-        const hasPermission = checkOrderPermission(order, actorId, actor, newStatus)
+        
+        // 对于线下交易的订单，允许卖家直接确认收货
+        let hasPermission = checkOrderPermission(order, actorId, actor, newStatus)
+        if(!hasPermission && order.transaction_method === 'face_to_face' && actor === 'seller' && newStatus === OrderStatus.COMPLETED) {
+            hasPermission = true
+        }
+        
         if (!hasPermission) {
             throw new Error('无权执行此操作')
         }
@@ -179,7 +186,7 @@ export const orderService = {
                 updateData.cancel_reason = request?.reason || '订单退款'
                 break
         }
-        const ok = await OrderModel.updateOrderStatus([orderId], newStatus, updateData);
+        const ok = await OrderModel.updateOrder(orderId, {...updateData, status: newStatus});
         if (!ok) {
             throw new Error('订单状态更新失败')
         }

@@ -98,14 +98,9 @@ const goToSettle = ()=>{
             <span class="coupon__item">{{cartStore.selectCoupons[row.merchantId]?.title}}</span>
           </template>
         </el-table-column>
-        <el-table-column label="数量" width="160" property="stock">
-          <template #default="{row}">
-            <el-input-number v-model="row.quantity":min="1" :max="10" size="small" @change="cartStore.changeQuantity(row.id,row.quantity)"/>
-          </template>
-        </el-table-column>
         <el-table-column label="金额/￥" width="140">
           <template #default="{row}">
-            {{row.price * row.quantity}}
+            {{row.price}}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="130">

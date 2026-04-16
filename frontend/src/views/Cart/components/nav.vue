@@ -1,5 +1,5 @@
 <script setup lang="ts">
-
+import search from '@/components/search/search.vue'
 </script>
 
 <template>

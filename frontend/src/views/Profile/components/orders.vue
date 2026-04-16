@@ -17,7 +17,7 @@ const tabs = ref([
   {label:'全部',name:'all'},
   {label:'交易中订单',name:'pending'},
   {label:'待确认',name:'confirmed'},
-  {label:'待付款',name:'paid'},
+  {label:'已付款',name:'paid'},
   {label:'待发货',name:'shipped'},
   {label:'待收货',name:'delivered'},
   {label:'待评价',name:'completed'},
@@ -296,7 +296,7 @@ const goToBatchPayment = (row:any) => {
           <el-table-column label="操作">
             <template #default="scope" style="position: relative">
               <el-button type="primary" @click="goToComment(scope.row)" v-if="scope.row.status === 'completed' && !isOrderReviewed(scope.row.id)">前往评论</el-button>
-              <el-button type="success" @click="goToBatchPayment(scope.row)" v-if="scope.row.status === 'paid'">前往付款</el-button>
+              <el-button type="success" @click="goToBatchPayment(scope.row)" v-if="scope.row.status === 'pending' || scope.row.status === 'confirmed'">前往付款</el-button>
             </template>
           </el-table-column>
         </el-table>

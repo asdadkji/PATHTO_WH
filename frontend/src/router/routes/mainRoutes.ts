@@ -151,6 +151,15 @@ export default [
           requireSeller: true,
           title: '订单管理'
         }
+      },
+      {
+        path: 'bookReviewProcess',
+        name: 'bookReviewProcess',
+        component: () => import('@/views/Seller/components/bookReviewProcess.vue'),
+        meta: {
+          requireSeller: true,
+          title: '图书审查流程'
+        }
       }
     ]
   }

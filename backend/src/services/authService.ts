@@ -17,6 +17,8 @@ export const AuthService = {
     async login(username: string, password: string) {
         const user = await AuthModel.findByUsername(username);
         if (!user) throw new Error('用户不存在');
+        // 检查用户是否被封禁
+        if (user.is_banned) throw new Error('账号已被封禁，无法登录');
         const ok = await bcrypt.compare(password, user.password_hash);
         if (!ok) throw new Error('密码错误');
         const payload = { userId: user.id,role: user.role };
@@ -48,6 +50,13 @@ export const AuthService = {
         const isMerchant = await AuthModel.existByUserId(userId)
         /*if(!isMerchant) throw new Error('您不是商家用户')*/
         return isMerchant
+    },
+    
+    //获取商家ID
+    async getMerchantId(userId: number) {
+        const merchantId = await AuthModel.getMerchantIdByUserId(userId)
+        if(!merchantId) throw new Error('您还不是商家，请先完成商家认证')
+        return merchantId
     }
 }
 

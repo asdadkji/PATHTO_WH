@@ -1,14 +1,43 @@
 //地址仓库
 import { defineStore } from 'pinia'
-import {reactive, ref} from "vue";
+import {reactive, ref, watch} from "vue";
 import type{updateAddress} from '@/types/store/address.ts'
 export const useAddressStore = defineStore('address', () => {
-  //地址列表
-  const addressList = reactive<updateAddress[]>([])
+  //地址列表 - 按用户ID隔离
+  const addressLists = reactive<Record<number, updateAddress[]>>({})
+  //当前用户ID
+  const currentUserId = ref<number | undefined>(undefined)
   //选中的地址
   const selectedAddressId = ref<number | undefined>(undefined)
-  //自定义地址列表id
-  let nextId = 1
+  //自定义地址列表id - 按用户ID隔离
+  const nextIds = reactive<Record<number, number>>({})
+  
+  //获取当前用户的地址列表
+  const addressList = reactive<updateAddress[]>([])
+  
+  //监听当前用户ID变化，更新地址列表
+
+  watch(currentUserId, (newUserId) => {
+    if (newUserId) {
+      // 清空当前地址列表
+      addressList.splice(0, addressList.length)
+      // 加载新用户的地址列表
+      const userAddresses = addressLists[newUserId] || []
+      addressList.push(...userAddresses)
+      // 初始化nextId
+      if (!nextIds[newUserId]) {
+        if (userAddresses.length > 0) {
+          const maxId = Math.max(...userAddresses.map((address: updateAddress) => address.id || 0))
+          nextIds[newUserId] = maxId + 1
+        } else {
+          nextIds[newUserId] = 1
+        }
+      }
+    } else {
+      // 清空当前地址列表
+      addressList.splice(0, addressList.length)
+    }
+  }, { immediate: true })
 
   //默认地址
   const defaultAddress = () => {
@@ -17,6 +46,9 @@ export const useAddressStore = defineStore('address', () => {
   //新增地址
   const addAddress = async (data:Omit<updateAddress, 'id'>) => {
     try {
+      const userId = data.userId
+      currentUserId.value = userId
+      
       if (data.isDefault) {
         addressList.forEach(addr => {
           addr.isDefault = false
@@ -24,10 +56,12 @@ export const useAddressStore = defineStore('address', () => {
       }
       const newAddress:updateAddress = {
         ...data,
-        id: nextId++
+        id: nextIds[userId]++
       }
       addressList.push(newAddress)
-      saveToLocalStorage(<number>data.userId)
+      // 更新用户地址列表
+      addressLists[userId] = [...addressList]
+      saveToLocalStorage(userId)
 
       return newAddress
     } catch (e) {
@@ -53,6 +87,13 @@ export const useAddressStore = defineStore('address', () => {
       ...updateData
     }
     addressList[index] = updatedAddress;
+    
+    const userId = updatedAddress?.userId;
+    if (userId) {
+      // 更新用户地址列表
+      addressLists[userId] = [...addressList]
+      saveToLocalStorage(Number(userId))
+    }
 
     return updatedAddress
   }
@@ -73,19 +114,36 @@ export const useAddressStore = defineStore('address', () => {
       selectedAddressId.value = undefined
     }
 
+    // 更新用户地址列表
+    addressLists[userId] = [...addressList]
     saveToLocalStorage(Number(userId))
   }
   //获取地址列表
   const getAddressList = (userId:number) => {
     try {
+      currentUserId.value = userId
       const saved = localStorage.getItem(`addresses_${userId}`)
       if (saved) {
-        const paresd = JSON.parse(saved)
-        addressList.splice(0, addressList.length, ...paresd);
-        if (paresd.length > 0) {
-          const maxId = Math.max(...paresd.map((address:updateAddress) => address.id || 0))
-          nextId = Math.max(maxId + 1, nextId)
+        const parsed = JSON.parse(saved)
+        // 清空当前地址列表
+        addressList.splice(0, addressList.length)
+        // 加载用户地址列表
+        addressList.push(...parsed)
+        // 更新用户地址列表
+        addressLists[userId] = [...parsed]
+        // 初始化nextId
+        if (parsed.length > 0) {
+          const maxId = Math.max(...parsed.map((address:updateAddress) => address.id || 0))
+          nextIds[userId] = Math.max(maxId + 1, nextIds[userId] || 1)
+        } else {
+          nextIds[userId] = 1
         }
+      } else {
+        // 清空当前地址列表
+        addressList.splice(0, addressList.length)
+        // 初始化用户地址列表
+        addressLists[userId] = []
+        nextIds[userId] = 1
       }
       return [...addressList]
     } catch (e) {
@@ -113,7 +171,8 @@ export const useAddressStore = defineStore('address', () => {
   //保存本地
   const saveToLocalStorage = (userId:number) => {
     try {
-      const rawList = JSON.parse(JSON.stringify(addressList))
+      const userAddresses = addressLists[userId] || addressList
+      const rawList = JSON.parse(JSON.stringify(userAddresses))
       localStorage.setItem(`addresses_${userId}`, JSON.stringify(rawList))
     } catch (e) {
       console.error('保存地址列表失败',e)
@@ -141,7 +200,6 @@ export const useAddressStore = defineStore('address', () => {
 
   return {
     addressList,
-    nextId,
     selectedAddressId,
     addAddress,
     updateAddress,
@@ -152,5 +210,6 @@ export const useAddressStore = defineStore('address', () => {
     initSelectedAddress,
     saveToLocalStorage,
     getFormattedAddress,
+    getAddressById,
   }
 })

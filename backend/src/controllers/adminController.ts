@@ -156,3 +156,97 @@ export const getDeliveredBooks = async (req: Request, res: Response) => {
         res.status(500).json({code:1,message: e.message})
     }
 }
+
+//获取买家列表
+export const getBuyerList = async (req: Request, res: Response) => {
+    try {
+        const adminId = Number(req.query.adminId);
+        const page = Number(req.query.page);
+        const pageSize = Number(req.query.pageSize);
+        const isAdmin = await adminService.isAdminS(adminId);
+        if(!isAdmin) {
+            return res.status(401).json({code:1,message: "没有权限"})
+        }
+        const result = await adminService.getBuyerListS(page, pageSize);
+        if(result) {
+            res.status(200).json({code:0,message: "成功获取买家列表",data: result})
+        }
+    }catch (e:any) {
+        console.log('获取买家列表失败',e)
+        res.status(500).json({code:1,message: e.message})
+    }
+}
+
+//获取买家详情
+export const getBuyerDetail = async (req: Request, res: Response) => {
+    try {
+        const adminId = Number(req.query.adminId);
+        const buyerId = Number(req.query.buyerId);
+        const isAdmin = await adminService.isAdminS(adminId);
+        if(!isAdmin) {
+            return res.status(401).json({code:1,message: "没有权限"})
+        }
+        const result = await adminService.getBuyerDetailS(buyerId);
+        if(result) {
+            res.status(200).json({code:0,message: "成功获取买家详情",data: result})
+        }
+    }catch (e:any) {
+        console.log('获取买家详情失败',e)
+        res.status(500).json({code:1,message: e.message})
+    }
+}
+
+//注销买家账号
+export const deleteBuyer = async (req: Request, res: Response) => {
+    try {
+        const adminId = Number(req.query.adminId);
+        const buyerId = Number(req.query.buyerId);
+        const reason = req.body.reason;
+        const isAdmin = await adminService.isAdminS(adminId);
+        if(!isAdmin) {
+            return res.status(401).json({code:1,message: "没有权限"})
+        }
+        const result = await adminService.deleteBuyerS(buyerId, reason);
+        if(result) {
+            res.status(200).json({code:0,message: "成功注销买家账号",data: result})
+        }
+    }catch (e:any) {
+        console.log('注销买家账号失败',e)
+        res.status(500).json({code:1,message: e.message})
+    }
+}
+
+//封禁买家账号
+export const banBuyer = async (req: Request, res: Response) => {
+    try {
+        const adminId = Number(req.query.adminId);
+        const buyerId = Number(req.query.buyerId);
+        const reason = req.body.reason;
+        const isAdmin = await adminService.isAdminS(adminId);
+        if(!isAdmin) {
+            return res.status(401).json({code:1,message: "没有权限"})
+        }
+        const result = await adminService.banBuyerS(buyerId, reason);
+        res.status(200).json({code:0,message: "成功封禁买家账号",data: result})
+    }catch (e:any) {
+        console.log('封禁买家账号失败',e)
+        res.status(500).json({code:1,message: e.message})
+    }
+}
+
+//解封买家账号
+export const unbanBuyer = async (req: Request, res: Response) => {
+    try {
+        const adminId = Number(req.query.adminId);
+        const buyerId = Number(req.query.buyerId);
+        const isAdmin = await adminService.isAdminS(adminId);
+        if(!isAdmin) {
+            return res.status(401).json({code:1,message: "没有权限"})
+        }
+        const result = await adminService.unbanBuyerS(buyerId);
+        res.status(200).json({code:0,message: "成功解封买家账号",data: result})
+    }catch (e:any) {
+        console.log('解封买家账号失败',e)
+        res.status(500).json({code:1,message: e.message})
+    }
+}

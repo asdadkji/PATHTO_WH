@@ -5,6 +5,10 @@ import {ref,computed} from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus'
 //引入持久化
 import storage from '@/utils/localstorage'
+//引入地址仓库
+import { useAddressStore } from './address';
+
+const addressStore = useAddressStore();
 //ts
 // 订单状态枚举
 export enum OrderStatus {
@@ -122,7 +126,7 @@ export const useOrderStore = defineStore('order', () => {
   const allOrdersList = ref<Order[]>([])           // 全部订单的独立副本
   const pendingOrdersList = ref<Order[]>([])       // 待处理订单
   const confirmedOrdersList = ref<Order[]>([])     // 待确认订单
-  const paidOrdersList = ref<Order[]>([])          // 待付款订单
+  const paidOrdersList = ref<Order[]>([])          // 已付款订单
   const shippedOrdersList = ref<Order[]>([])       // 待发货订单
   const deliveredOrdersList = ref<Order[]>([])     // 待收货订单
   const completedOrdersList = ref<Order[]>([])     // 已完成订单
@@ -220,6 +224,7 @@ export const useOrderStore = defineStore('order', () => {
       const index = orders.value.findIndex(item => item.id === orderId)
       if (index !== -1) orders.value[index] = res
     }
+    return res
   }
   //取消订单
   const cancelOrderApi = async (userId: number, orderId: number, userRole: string) => {
@@ -234,15 +239,11 @@ export const useOrderStore = defineStore('order', () => {
     try {
       const res = await processPayment(userId, orderId, payment_method, payment_id)
       if (res) {
-        const index = orders.value.findIndex(item => item.id === orderId)
-        if (index !== -1) {
-          orders.value[index] = res
-        } else {
-          throw new Error('订单不存在')
-        }
+        // 直接返回成功，不需要在本地数组中查找订单
+        return res
       }
-    } catch (e) {
-      throw new Error('支付失败')
+    } catch (e: any) {
+      throw new Error(e.message || '支付失败')
     }
   }
   /**
@@ -457,6 +458,7 @@ export const useOrderStore = defineStore('order', () => {
       const index = orders.value.findIndex(item => item.id === orderId)
       if (index !== -1) orders.value[index] = res
     }
+    return res
   }
   //买家收货
   const receiveOrderApi = async (userId: number, orderId: number) => {
@@ -470,7 +472,78 @@ export const useOrderStore = defineStore('order', () => {
   const getOrdersToDeliverApi = async (userRole:string,params:DeliveryOrderParams) => {
     const res = await getOrdersToDeliver(userRole,params)
     if(res) {
-      deliveryOrders.value = res.orders
+      console.log('Received orders:', res.orders);
+      // 为每个订单添加卖家地址信息
+      const ordersWithSellerAddress = res.orders.map(order => {
+        console.log('Processing order:', order.id, 'seller_id:', order.seller_id);
+        // 获取卖家的地址列表
+        const sellerId = order.seller_id || 0;
+        console.log('Getting address list for seller:', sellerId);
+        
+        if (sellerId === 0) {
+          console.log('Seller ID is 0, cannot get address');
+          return {
+            ...order,
+            seller_address: '卖家ID无效'
+          };
+        }
+        
+        // 检查本地存储中是否有该卖家的地址
+        const savedAddresses = localStorage.getItem(`addresses_${sellerId}`);
+        console.log('Saved addresses in localStorage:', savedAddresses);
+        
+        if (!savedAddresses) {
+          console.log('No saved addresses for seller:', sellerId);
+          return {
+            ...order,
+            seller_address: '卖家未设置地址'
+          };
+        }
+        
+        try {
+          const sellerAddresses = addressStore.getAddressList(sellerId);
+          console.log('Seller addresses from store:', sellerAddresses);
+          
+          if (sellerAddresses.length === 0) {
+            console.log('Seller address list is empty');
+            return {
+              ...order,
+              seller_address: '卖家地址列表为空'
+            };
+          }
+          
+          // 找到默认地址或第一个地址作为卖家地址
+          const defaultSellerAddress = sellerAddresses.find(addr => addr.isDefault) || sellerAddresses[0];
+          console.log('Default seller address:', defaultSellerAddress);
+          
+          if (!defaultSellerAddress) {
+            console.log('No default seller address found');
+            return {
+              ...order,
+              seller_address: '未找到卖家地址'
+            };
+          }
+          
+          // 格式化卖家地址
+          let sellerAddress = '暂无地址信息';
+          if (defaultSellerAddress) {
+            sellerAddress = defaultSellerAddress.address || '暂无地址信息';
+            console.log('Formatted seller address:', sellerAddress);
+          }
+          
+          return {
+            ...order,
+            seller_address: sellerAddress
+          };
+        } catch (error) {
+          console.error('Error getting seller address:', error);
+          return {
+            ...order,
+            seller_address: '获取卖家地址失败'
+          };
+        }
+      });
+      deliveryOrders.value = ordersWithSellerAddress
       deliveryPagination.value = {
         total: res.total,
         page: res.page,

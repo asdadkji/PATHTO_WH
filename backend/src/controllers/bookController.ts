@@ -88,3 +88,18 @@ export const getMerchantBooks = async (req: Request, res: Response) => {
         console.log('获取失败',e)
     }
 }
+
+//更新商家图书的线下交易设置
+export const updateMerchantOfflineTrade = async (req: Request, res: Response) => {
+    try {
+        const { merchantId, enabled } = req.body;
+        if (!merchantId) {
+            return res.status(400).json({code:1, message: 'merchantId is required'});
+        }
+        const data = await BookService.updateMerchantOfflineTrade(merchantId, enabled);
+        res.json({code:0, data, message:'更新成功'})
+    } catch (e) {
+        console.log('更新线下交易设置失败',e);
+        res.json({code:1, message: '更新失败'});
+    }
+}

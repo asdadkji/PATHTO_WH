@@ -17,10 +17,17 @@ const authStore = useAuthStore()
 import {ElMessage} from 'element-plus'
 //引入本地存储工具
 import storage from "@/utils/localstorage.ts";
+//引入路由
+import { useRouter } from 'vue-router';
+const router = useRouter();
+//引入地址仓库
+import { useAddressStore } from '@/stores/address.ts';
+const addressStore = useAddressStore();
+//引入API服务
+import service from '@/apis/http.ts';
 //tab配置
 const tabs = ref([
   {label:'全部',name:'all'},
-  {label:'待确认',name:'pending'},
   {label:'待付款',name:'confirmed'},
   {label:'待发货',name:'paid'},
   {label:'待收货',name:'delivered'},
@@ -47,7 +54,6 @@ onMounted(async () => {
   // 获取全部订单
   orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'all')
   // 预加载其他状态的订单
-  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'pending')
   orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'confirmed')
   orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'paid')
   orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,'shipped')
@@ -57,19 +63,45 @@ onMounted(async () => {
 //具体订单类容
 const orderData = computed(()=>({
   all:orderStore?.allOrdersList,
-  pending:orderStore?.pendingOrdersList,
-  confirmed:orderStore?.confirmedOrdersList,
-  paid:orderStore?.paidOrdersList,
-  shipped:orderStore?.shippedOrdersList,
-  delivered:orderStore?.deliveredOrdersList,
-  completed:orderStore?.completedOrdersList,
+  confirmed:orderStore?.confirmedOrdersList, // 待付款
+  paid:orderStore?.paidOrdersList, // 待发货
+  delivered:orderStore?.deliveredOrdersList, // 待收货
+  completed:orderStore?.completedOrdersList, // 待评价
 }))
 //订单、tab映射
 const getTabData = (tabName:string) => {
   return (orderData as any).value[tabName] || []
 }
-const handleShip = (orderId:number) => {
-  orderStore.shipSellerOrderApi(1,Number(orderId),'顺丰',123456)
+const handleShip = async (orderId:number) => {
+  try {
+    // 获取卖家地址信息
+    const userId = authStore.userId || 1;
+    const sellerAddresses = addressStore.getAddressList(userId);
+    
+    if (sellerAddresses.length === 0) {
+      // 弹出提示弹窗
+      ElMessage.warning('您尚未设置发货地址，无法进行发货操作');
+      // 跳转到用户中心的地址管理界面
+      router.push('/profile/address');
+      return;
+    }
+    
+    // 如果已设置地址，正常执行发货操作
+    const result = await orderStore.shipSellerOrderApi(authStore.userId || 1, Number(orderId), '顺丰', Date.now());
+    if (result) {
+      ElMessage.success('发货成功');
+      // 刷新所有相关订单列表
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'all');
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'paid'); // 刷新待发货列表
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'shipped'); // 刷新已发货列表
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'delivered'); // 刷新待收货列表
+    } else {
+      ElMessage.error('发货失败，请重试');
+    }
+  } catch (error) {
+    console.error('发货失败:', error);
+    ElMessage.error('发货失败，请重试');
+  }
 }
 
 // 线下交易相关
@@ -79,9 +111,25 @@ const locationInput = ref(storage.get('offline_trade_location') || '')
 const locationUpdateCount = ref(storage.get('offline_trade_location_update_count') || 0)
 const maxLocationUpdates = 3
 
+// 引入获取商家ID的API
+import { getMerchantId } from '@/apis/services/auth.ts'
+
 // 监听值变化，保存到本地存储
-watch(offlineTradeEnabled, (newValue) => {
+watch(offlineTradeEnabled, async (newValue) => {
   storage.set('offline_trade_enabled', newValue)
+  // 调用API更新数据库
+  try {
+    // 先获取商家ID
+    const merchantId = await getMerchantId(authStore.userId!)
+    await service.patch('/filter/offline-trade', {
+      merchantId: merchantId,
+      enabled: newValue
+    })
+    ElMessage.success(newValue ? '线下交易已开启' : '线下交易已关闭')
+  } catch (error) {
+    console.error('更新线下交易设置失败:', error)
+    ElMessage.error('更新线下交易设置失败')
+  }
 })
 
 watch(locationInput, (newValue) => {
@@ -94,7 +142,7 @@ watch(locationUpdateCount, (newValue) => {
 
 // 检查订单是否为线下交易
 const isOfflineTradeOrder = (order: any) => {
-  return order.transaction_method && order.transaction_method.includes('offline')
+  return order.transaction_method && order.transaction_method === 'face_to_face'
 }
 
 // 确认线下交易完成
@@ -102,7 +150,27 @@ const confirmOfflineTrade = (orderId: number) => {
   // 这里应该调用API更新订单状态
   ElMessage.success('线下交易已标记为完成')
   // 刷新订单列表
-  orderStore.getUserOrdersList(1,'seller',1,10,activeName.value)
+  orderStore.getUserOrdersList(authStore.userId || 1,'seller',1,10,activeName.value)
+}
+
+// 确认线下交易收货
+const confirmOfflineReceipt = async (orderId: number) => {
+  try {
+    // 调用API更新订单状态为completed
+    const result = await orderStore.updateOrderStatus(authStore.userId || 1, orderId, 'seller', 'completed');
+    if (result) {
+      ElMessage.success('确认收货成功');
+      // 刷新订单列表
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'all');
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'delivered');
+      orderStore.getUserOrdersList(authStore.userId || 1, 'seller', 1, 10, 'completed');
+    } else {
+      ElMessage.error('确认收货失败，请重试');
+    }
+  } catch (error) {
+    console.error('确认收货失败:', error);
+    ElMessage.error('确认收货失败，请重试');
+  }
 }
 
 // 处理交易地点修改
@@ -141,17 +209,12 @@ watch(()=>orderStore.orders,(newVal)=>{
     <el-tabs v-model="activeName" @tab-click="handleClick">
       <el-tab-pane v-for="tab in tabs" :key="tab.name" :label="tab.label" :name="tab.name">
         <el-table :data="getTabData(tab.name)" style="width: 100%">
-          <el-table-column label="图书图片" width="120">
-            <template #default="scope">
-              <el-image v-if="scope.row.book_snapshot?.cover_image" fit="cover" style="width: 80px;height: 100px"/>
-              <span v-else>无图片</span>
-            </template>
-          </el-table-column>
+
           <el-table-column label="图书名称">
             <template #default="scope">
               <div>
                 <span style="font-weight: bold">{{ scope.row.book_snapshot?.title }}</span>
-                <el-tag v-if="isOfflineTradeOrder(scope.row)" type="warning" size="small" style="margin-left: 10px">线下交易</el-tag>
+                <el-tag v-if="isOfflineTradeOrder(scope.row)" type="danger" size="small" effect="dark" style="margin-left: 10px; font-weight: bold;">线下交易</el-tag>
               </div>
             </template>
           </el-table-column>
@@ -176,7 +239,7 @@ watch(()=>orderStore.orders,(newVal)=>{
                 v-show="!isOfflineTradeOrder(scope.row) && scope.row.status === 'paid' && scope.row.payment_status === 'paid'"
                 link
               >
-                发货
+                确认发货
               </el-button>
               <el-button
                 type="success"
@@ -184,7 +247,15 @@ watch(()=>orderStore.orders,(newVal)=>{
                 v-show="isOfflineTradeOrder(scope.row) && scope.row.status === 'confirmed'"
                 link
               >
-                确认交易完成
+                确认线下交易
+              </el-button>
+              <el-button
+                type="success"
+                @click="confirmOfflineReceipt(scope.row.id)"
+                v-show="isOfflineTradeOrder(scope.row) && scope.row.status !== 'completed'"
+                link
+              >
+                确认买家收货
               </el-button>
             </template>
           </el-table-column>

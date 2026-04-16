@@ -210,13 +210,17 @@ export const OrderModel = {
         if(status && status !== 'all'){
             whereClause += (whereClause ? ' AND' : ' WHERE') + ' status = ?'
             params.push(status)
+        } else if(status === 'all'){
+            // 当status为'all'时，返回所有状态的订单
+            whereClause += (whereClause ? ' AND' : ' WHERE') + ' status IN (?, ?, ?, ?, ?)'
+            params.push('confirmed', 'paid', 'shipped', 'delivered', 'completed')
         }
         if(startDate){
-            whereClause += (whereClause ? ' AND' : ' WHERE') + ' create_time >= ?'
+            whereClause += (whereClause ? ' AND' : ' WHERE') + ' created_at >= ?'
             params.push(startDate)
         }
         if(endDate){
-            whereClause += (whereClause ? ' AND' : ' WHERE') + ' create_time <= ?'
+            whereClause += (whereClause ? ' AND' : ' WHERE') + ' created_at <= ?'
             params.push(endDate)
         }
         if(keyword){
@@ -272,7 +276,7 @@ export const OrderModel = {
         const {tracking_company,start_date,end_date,buyer_name,buyer_phone} = filter;
         const {page=1,pageSize=20} = options;
         const offset = (page - 1) * pageSize;
-        let whereClause = "WHERE status = 'shipped'";
+        let whereClause = "WHERE status = 'shipped' AND transaction_method != 'face_to_face'";
         const params:any[] = [];
         if(tracking_company){
             whereClause += " AND tracking_company = ?";

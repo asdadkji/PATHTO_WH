@@ -39,6 +39,35 @@ const handleSubmitOrder = async () => {
     ElMessage.warning('请选择商品')
     return
   }
+  
+  // 检查是否有选中的地址
+  if (!addressStore.selectedAddressId) {
+    ElMessage.warning('请选择收货地址')
+    return
+  }
+  
+  // 获取选中的地址信息
+  const selectedAddress = addressStore.getAddressById(Number(addressStore.selectedAddressId))
+  if (!selectedAddress) {
+    ElMessage.error('选中的地址不存在')
+    return
+  }
+  
+  // 确保地址已保存到addressStore中
+  if (!addressStore.addressList.some(addr => addr.id === selectedAddress.id)) {
+    try {
+      await addressStore.addAddress({
+        userId: authStore?.userId ?? 1,
+        username: selectedAddress.username,
+        phone: selectedAddress.phone,
+        address: selectedAddress.address,
+        isDefault: selectedAddress.isDefault
+      })
+    } catch (e) {
+      console.error('保存地址失败:', e)
+    }
+  }
+  
   const paramsList = toValue(cartStore.selectedItems).map(item => ({
     book_id: Number(item.id),
     book_snapshot: item as Record<string, any>,
@@ -58,7 +87,7 @@ const handleSubmitOrder = async () => {
     )
     if (!createdOrders.length) throw new Error('未生成任何订单')
 
-    const orderIds = createdOrders.map(o => o.book_id).join(',')
+    const orderIds = createdOrders.map(o => o.id).join(',')
 
     await router.push({
       name: 'checkout',

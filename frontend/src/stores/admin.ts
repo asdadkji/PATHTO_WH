@@ -1,7 +1,7 @@
 //后台仓库
 import { defineStore } from 'pinia'
 import {ref, computed, watch} from 'vue'
-import {getUserCountApi,getUserSexApi,getChartDataApi,getAdminListApi,setAdminApi,cancelAdminApi,getShopListApi,freezeShopApi,unfreezeShopApi,getOrdersToDeliverApi} from '@/apis/services/admin.ts'
+import {getUserCountApi,getUserSexApi,getChartDataApi,getAdminListApi,setAdminApi,cancelAdminApi,getShopListApi,freezeShopApi,unfreezeShopApi,getOrdersToDeliverApi,getBuyerListApi,getBuyerDetailApi,deleteBuyerApi,banBuyerApi,unbanBuyerApi} from '@/apis/services/admin.ts'
 import {useIntervalFn, useStorage, useTransition} from "@vueuse/core";
 import {ElMessage} from "element-plus";
 import {OrderStatus, PaymentMethod} from "@/stores/orders.ts";
@@ -84,6 +84,12 @@ export const useAdminStore = defineStore('admin', () => {
   const adminList = ref<adminList[]>([])
   //商家列表
   const shopList = ref<sellerBase[]>([])
+  //买家列表
+  const buyerList = ref<any[]>([])
+  //买家总数
+  const total = ref(0)
+  //买家详情
+  const buyerDetail = ref<any>(null)
   //已送达订单
   const deliveryOrders = useStorage<Order[]>('deliveryOrders',[])
 
@@ -194,11 +200,91 @@ export const useAdminStore = defineStore('admin', () => {
       console.log('前端解冻商家权限失败',e)
     }
   }
+  
+  //获取买家列表
+  const fetchBuyers = async (page:number,pageSize:number) => {
+    try {
+      const res = await getBuyerListApi(authStore.userId!,page,pageSize)
+      if(res) {
+        buyerList.value = res.data
+        total.value = res.pagination.total
+      }
+    }catch (e) {
+      console.log('前端获取买家列表失败',e)
+    }
+  }
+  
+  //获取买家详情
+  const fetchBuyerDetail = async (buyerId:number) => {
+    try {
+      const res = await getBuyerDetailApi(authStore.userId!,buyerId)
+      if(res) {
+        buyerDetail.value = res
+      }
+    }catch (e) {
+      console.log('前端获取买家详情失败',e)
+    }
+  }
+  
+  //注销买家账号
+  const deleteBuyer = async (buyerId:number,reason:string) => {
+    try {
+      const res = await deleteBuyerApi(authStore.userId!,buyerId,reason)
+      if(res) {
+        ElMessage.success('注销买家账号成功')
+        await fetchBuyers(1,10)
+      }
+    }catch (e) {
+      console.log('前端注销买家账号失败',e)
+    }
+  }
+  
+  //封禁买家账号
+  const banBuyer = async (buyerId:number,reason:string) => {
+    try {
+      console.log('调用banBuyerApi，buyerId:', buyerId, 'reason:', reason)
+      const res = await banBuyerApi(authStore.userId!,buyerId,reason)
+      console.log('banBuyerApi返回:', res)
+      if(res) {
+        ElMessage.success('封禁买家账号成功')
+        console.log('重新获取买家列表')
+        await fetchBuyers(1,10)
+        console.log('重新获取买家详情')
+        await fetchBuyerDetail(buyerId)
+      }
+    }catch (e) {
+      console.log('前端封禁买家账号失败',e)
+    }
+  }
+  
+  //解封买家账号
+  const unbanBuyer = async (buyerId:number) => {
+    try {
+      console.log('调用unbanBuyerApi，buyerId:', buyerId)
+      const res = await unbanBuyerApi(authStore.userId!,buyerId)
+      console.log('unbanBuyerApi返回:', res)
+      if(res) {
+        ElMessage.success('解封买家账号成功')
+        console.log('重新获取买家列表')
+        await fetchBuyers(1,10)
+        console.log('重新获取买家详情')
+        await fetchBuyerDetail(buyerId)
+      }
+    }catch (e) {
+      console.log('前端解封买家账号失败',e)
+    }
+  }
   //获取已送达的订单
   const fetchOrdersToDeliver = async () => {
     try {
       const res = await getOrdersToDeliverApi()
       if(res) {
+        console.log('Received delivered orders:', res);
+        // 查看第一个订单的结构
+        if (res.length > 0) {
+          console.log('First delivered order structure:', res[0]);
+          console.log('First delivered order shipping_address:', res[0].shipping_address);
+        }
         deliveryOrders.value = res
       }else {
         console.log('获取已送达订单失败')
@@ -244,6 +330,14 @@ export const useAdminStore = defineStore('admin', () => {
     adminList,
     fetchAdminList,
     fetchOrdersToDeliver,
-    deliveryOrders
+    deliveryOrders,
+    buyerList,
+    total,
+    buyerDetail,
+    fetchBuyers,
+    fetchBuyerDetail,
+    deleteBuyer,
+    banBuyer,
+    unbanBuyer
   }
 })

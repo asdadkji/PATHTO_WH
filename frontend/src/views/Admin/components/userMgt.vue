@@ -13,7 +13,6 @@ const tableData = [
   {
     role:'一级管理员',
     username: '张三',
-    scope:['用户与角色管理','系统设置与维护','数据全权访问'],
     lastLoginTime:'2022-01-01',
     status:'正常',
     phone:'1234567890',
@@ -21,7 +20,6 @@ const tableData = [
   {
     role:'二级管理员',
     username: '张三',
-    scope:'清除用户',
     lastLoginTime:'2022-01-01',
     status:'正常',
     phone:'1234567890',
@@ -29,7 +27,6 @@ const tableData = [
   {
     role:'运输员',
     username: '张三',
-    scope:'清除用户',
     lastLoginTime:'2022-01-01',
     status:'正常',
     phone:'1234567890',
@@ -37,7 +34,6 @@ const tableData = [
   {
     role:'一级管理员',
     username: '张三',
-    scope:['用户与角色管理','系统设置与维护','数据全权访问'],
     lastLoginTime:'2022-01-01',
     status:'正常',
     phone:'1234567890',
@@ -45,7 +41,6 @@ const tableData = [
   {
     role:'二级管理员',
     username: '张三',
-    scope:'清除用户',
     lastLoginTime:'2022-01-01',
     status:'正常',
     phone:'1234567890',
@@ -53,7 +48,6 @@ const tableData = [
   {
     role:'运输员',
     username: '张三',
-    scope:'清除用户',
     lastLoginTime:'2022-01-01',
     status:'正常',
     phone:'1234567890',
@@ -65,10 +59,12 @@ const formInline = reactive({
   phone:'',
   region:'',
 })
+
 //列表初始化
 onMounted(()=>{
   adminStore.fetchAdminList()
 })
+
 //取消权限
 const cancelAdmin = async (userId:number) => {
   await ElMessageBox.confirm('注意！你正在移除该管理员的权限，其将会被移出管理员列表','移除管理员权限')
@@ -107,6 +103,7 @@ const giveAdmin = async () => {
       </el-form>
       <span style="margin-left: 8px;color: #b6001d;font-family: 'Georgia', 'Times New Roman', 'Songti SC', serif;">"伟大的权力意味着伟大的责任"</span>
     </div>
+    
     <div class="userMgt__table">
       <el-table :data="adminStore.adminList" style="width: 100%" height="715">
         <el-table-column prop="role" label="权限等级" width="180" fixed>
@@ -117,7 +114,6 @@ const giveAdmin = async () => {
           </template>
         </el-table-column>
         <el-table-column prop="username" label="用户名" width="180" />
-        <el-table-column prop="bio" label="权限范围" width="180" />
         <el-table-column prop="last_login_at" label="上次登录时间" width="180">
           <template #default="scope">
             <span>{{ dayjs(scope.row.last_login_at).format('YYYY-MM-DD') }}</span>

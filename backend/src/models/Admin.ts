@@ -181,7 +181,7 @@ export const AdminModel = {
     },
     //获取管理员列表
     async getAdminList() {
-        const sql = "SELECT * FROM users WHERE role = 'admin' ";
+        const sql = "SELECT * FROM users WHERE role IN ('admin', 'transporter', 'maxAdmin') ";
         const [rows] = await pool.query(sql);
         return rows;
     },
@@ -212,5 +212,52 @@ export const AdminModel = {
         const sql = "SELECT * FROM orders WHERE status = 'delivered' ORDER BY created_at DESC";
         const [rows] = await pool.query(sql);
         return rows;
+    },
+    
+    //获取买家列表
+    async getBuyerList(page: number, pageSize: number) {
+        const offset = (page - 1) * pageSize;
+        const sql = "SELECT * FROM users WHERE role IN ('student', 'teacher') LIMIT ? OFFSET ?";
+        const [rows] = await pool.query(sql, [pageSize, offset]);
+        
+        const countSql = "SELECT COUNT(*) as total FROM users WHERE role IN ('student', 'teacher')";
+        const [countResult] = await pool.query(countSql) as any[][];
+        const total = (countResult[0] as any)?.total || 0;
+        return {
+            data: rows,
+            pagination: {
+                total,
+                pageSize,
+                current: page,
+            }
+        };
+    },
+    
+    //获取买家详情
+    async getBuyerDetail(buyerId: number) {
+        const sql = "SELECT * FROM users WHERE id = ?";
+        const [rows] = await pool.query(sql, [buyerId]) as [any[], any];
+        return rows[0];
+    },
+    
+    //注销买家账号
+    async deleteBuyer(buyerId: number, reason: string) {
+        const sql = "UPDATE users SET is_banned = 1, status = 'inactive', reason = ? WHERE id = ?";
+        await pool.query(sql, [reason, buyerId]);
+        return 'ok';
+    },
+    
+    //封禁买家账号
+    async banBuyer(buyerId: number, reason: string) {
+        const sql = "UPDATE users SET is_banned = 1, ban_reason = ? WHERE id = ?";
+        const [result] = await pool.query(sql, [reason, buyerId]);
+        return result;
+    },
+    
+    //解封买家账号
+    async unbanBuyer(buyerId: number) {
+        const sql = "UPDATE users SET is_banned = 0, ban_reason = NULL WHERE id = ?";
+        const [result] = await pool.query(sql, [buyerId]);
+        return result;
     }
 }

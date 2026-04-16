@@ -41,15 +41,7 @@ export default [
       }
     }
   },
-  {
-    path: 'security',
-    name: 'security',
-    component: () => import('@/views/Admin/components/security.vue'), // 路由懒加载
-    meta: {
-      requireAdmin: true,
-      title: '安全日志'
-    }
-  },
+
   {
     path: 'transport',
     name: 'transport',
@@ -58,10 +50,10 @@ export default [
       requireAdmin: true,
       title: '物流管理'
     },
-    allowedRoles:['transporter'],
+    allowedRoles:['transporter','admin','maxAdmin'],
     beforeEnter: (to:any, from:any, next:any) => {
       const authStore = useAuthStore();
-      if (authStore.isTransport) {
+      if (authStore.isTransport || authStore.isAdmin || authStore.isMaxAdmin) {
         next();
         return;
       } else {
@@ -70,15 +62,7 @@ export default [
       }
     }
   },
-  {
-    path: 'setting',
-    name: 'setting',
-    component: () => import('@/views/Admin/components/setting.vue'), // 路由懒加载
-    meta: {
-      requireAdmin: true,
-      title: '平台设置'
-    }
-  },
+
   {
     path: 'sellers',
     name: 'sellers',
@@ -100,12 +84,52 @@ export default [
     }
   },
   {
+    path: 'buyers',
+    name: 'buyers',
+    component: () => import('@/views/Admin/components/buyerMgt.vue'), // 路由懒加载
+    meta: {
+      requireAdmin: true,
+      title: '买家管理',
+      allowedRoles:['admin','maxAdmin']
+    },
+    beforeEnter: (to:any, from:any, next:any) => {
+      const authStore = useAuthStore();
+      if (authStore.isMaxAdmin || authStore.isAdmin) {
+        next();
+        return;
+      } else {
+        next('/403');
+        return
+      }
+    }
+  },
+  {
     path: 'ordersA',
     name: 'ordersA',
     component: () => import('@/views/Admin/components/orderMgt.vue'), // 路由懒加载
     meta: {
       requireAdmin: true,
       title: '订单管理',
+      allowedRoles:['admin','maxAdmin']
+    },
+    beforeEnter: (to:any, from:any, next:any) => {
+      const authStore = useAuthStore();
+      if (authStore.isMaxAdmin || authStore.isAdmin) {
+        next();
+        return;
+      } else {
+        next('/403');
+        return
+      }
+    }
+  },
+  {
+    path: 'bookReview',
+    name: 'bookReview',
+    component: () => import('@/views/Admin/components/bookReview.vue'), // 路由懒加载
+    meta: {
+      requireAdmin: true,
+      title: '图书审查',
       allowedRoles:['admin','maxAdmin']
     },
     beforeEnter: (to:any, from:any, next:any) => {

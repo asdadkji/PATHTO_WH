@@ -47,8 +47,61 @@ const activeIndex = ref(0)
 // 线下交易相关
 const showOfflineTradeDialog = ref(false)
 const showConfirmDialog = ref(false)
-// 从本地存储读取初始状态
-const offlineTradeSelected = ref(storage.get('offline_trade_selected') || false)
+// 与商品ID关联的线下交易状态
+const getOfflineTradeKey = (bookId: number) => {
+  return `offline_trade_selected_${bookId}`
+}
+
+// 检查相关订单状态
+const checkOrderStatus = async () => {
+  const bookId = bookStore.bookData?.id
+  if (!bookId || !authStore.userId) return
+  
+  try {
+    // 获取用户的订单列表
+    await orderStore.getUserOrdersList(authStore.userId, 'buyer', 1, 10, 'all')
+    
+    // 查找与当前商品相关的线下交易订单
+    const relatedOrders = orderStore.orders.filter(order => 
+      order.book_id === bookId && 
+      order.transaction_method === 'face_to_face'
+    )
+    
+    // 检查是否有已取消的订单
+    const hasCancelledOrder = relatedOrders.some(order => 
+      order.status === 'cancelled'
+    )
+    
+    // 如果有已取消的订单，重置线下交易状态
+    if (hasCancelledOrder) {
+      const key = getOfflineTradeKey(bookId)
+      storage.remove(key)
+      console.log('已重置线下交易状态，因为订单已取消')
+    }
+  } catch (error) {
+    console.error('检查订单状态失败:', error)
+  }
+}
+
+const offlineTradeSelected = computed({
+  get: () => {
+    const bookId = bookStore.bookData?.id
+    const value = bookId ? storage.get(getOfflineTradeKey(bookId)) || false : false
+    console.log('offlineTradeSelected get:', value)
+    console.log('bookId:', bookId)
+    console.log('getOfflineTradeKey:', bookId ? getOfflineTradeKey(bookId) : 'no bookId')
+    return value
+  },
+  set: (value) => {
+    const bookId = bookStore.bookData?.id
+    console.log('offlineTradeSelected set:', value)
+    console.log('bookId:', bookId)
+    if (bookId) {
+      storage.set(getOfflineTradeKey(bookId), value)
+      console.log('storage set:', getOfflineTradeKey(bookId), value)
+    }
+  }
+})
 
 // 检查商品是否支持线下交易
 const isOfflineTradeSupported = computed(() => {
@@ -56,18 +109,43 @@ const isOfflineTradeSupported = computed(() => {
   const offlineTradeEnabled = storage.get('offline_trade_enabled') || false
 
   // 同时检查商品数据中的transaction_methods
-  const transactionMethods = bookStore.bookData?.transaction_methods || []
+  let transactionMethods = bookStore.bookData?.transaction_methods || []
+  // 处理transaction_methods可能是JSON字符串的情况
+  if (typeof transactionMethods === 'string') {
+    try {
+      transactionMethods = JSON.parse(transactionMethods)
+    } catch (e) {
+      transactionMethods = []
+    }
+  }
   const hasOfflineMethod = Array.isArray(transactionMethods) && transactionMethods.some((method: string) =>
-    method.includes('offline')
+    method.includes('face_to_face')
   )
 
   // 只要满足其中一个条件就显示线下交易标记
-  return offlineTradeEnabled || hasOfflineMethod
+  const result = offlineTradeEnabled || hasOfflineMethod
+  console.log('isOfflineTradeSupported:', result)
+  console.log('offlineTradeEnabled:', offlineTradeEnabled)
+  console.log('hasOfflineMethod:', hasOfflineMethod)
+  console.log('transactionMethods:', transactionMethods)
+  console.log('bookStore.bookData:', bookStore.bookData)
+  return result
 })
+
+// 处理线下交易点击
+const handleOfflineTradeClick = () => {
+  console.log('handleOfflineTradeClick called')
+  console.log('offlineTradeSelected.value:', offlineTradeSelected.value)
+  if (!offlineTradeSelected.value) {
+    openOfflineTradeDialog()
+  }
+}
 
 // 打开线下交易弹窗
 const openOfflineTradeDialog = () => {
+  console.log('openOfflineTradeDialog called')
   showOfflineTradeDialog.value = true
+  console.log('showOfflineTradeDialog.value:', showOfflineTradeDialog.value)
 }
 
 // 关闭线下交易弹窗
@@ -134,7 +212,10 @@ const confirmOfflineTrade = async () => {
       // 设置线下交易已选择，禁用线上交易按钮
       offlineTradeSelected.value = true
       // 保存到本地存储，确保刷新后状态不丢失
-      storage.set('offline_trade_selected', true)
+      const bookId = bookStore.bookData?.id
+      if (bookId) {
+        storage.set(getOfflineTradeKey(bookId), true)
+      }
       // 显示成功提示
       ElMessage.success('线下交易订单已创建，请与卖家联系完成交易')
     } else {
@@ -170,6 +251,8 @@ const switchImage = ()=>{
 onMounted(async ()=>{
   await bookStore.getBookDetailById(Number(route.params.id))
   await couponStore.getMerchantCoupons(1) /*bookStore.bookData.merchant_id*/
+  // 检查订单状态，重置已取消订单的线下交易状态
+  await checkOrderStatus()
 })
 //判定是否加入购物车
 const isFavorite = ref(false)
@@ -286,8 +369,10 @@ const conditionText = computed(() => {
           <span style="font-size: 12px">品相</span><span>{{ conditionText }}</span>
         </p>
         <!-- 线下交易标记 -->
-        <p v-if="isOfflineTradeSupported" class="offline-trade-tag" @click="openOfflineTradeDialog">
-          <span style="color: #ff6700; font-weight: bold; cursor: pointer;">本商品支持线下交易</span>
+        <p v-if="isOfflineTradeSupported" class="offline-trade-tag" @click="handleOfflineTradeClick" :class="{ 'disabled': offlineTradeSelected }">
+          <span :style="{ color: '#ff6700', fontWeight: 'bold', cursor: offlineTradeSelected ? 'not-allowed' : 'pointer' }">
+            {{ offlineTradeSelected ? '已选择线下交易' : '本商品支持线下交易' }}
+          </span>
         </p>
       </div>
       <el-dropdown :hide-on-click="false" placement="bottom-start">
@@ -658,10 +743,20 @@ $transition: all 0.3s ease;
   transition: $transition;
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(.disabled) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 103, 0, 0.15);
     background-color: rgba(255, 103, 0, 0.15);
+  }
+
+  &.disabled {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-left-color: #ccc;
+    cursor: not-allowed;
+
+    span {
+      color: #999;
+    }
   }
 
   span {
