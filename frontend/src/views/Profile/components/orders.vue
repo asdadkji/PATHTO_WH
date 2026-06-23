@@ -15,10 +15,10 @@ type TabName = 'all' | 'pending' | 'confirmed' | 'paid' | 'shipped' | 'delivered
 //tab配置
 const tabs = ref([
   {label:'全部',name:'all'},
-  {label:'交易中订单',name:'pending'},
-  {label:'待确认',name:'confirmed'},
-  {label:'已付款',name:'paid'},
-  {label:'待发货',name:'shipped'},
+  {label:'待确认',name:'pending'},
+  {label:'待付款',name:'confirmed'},
+  {label:'待发货',name:'paid'},
+  {label:'待运输',name:'shipped'},
   {label:'待收货',name:'delivered'},
   {label:'待评价',name:'completed'},
 ])
@@ -40,6 +40,31 @@ const filterForm = reactive({
   startDate: '',
   endDate: ''
 })
+
+//分页配置
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+//处理页码变化
+const handleCurrentChange = async (page: number) => {
+  currentPage.value = page
+  // 准备筛选参数
+  const filterParams = {
+    keyword: filterForm.keyword,
+    sortBy: filterForm.sortBy,
+    sortOrder: filterForm.sortOrder,
+    startDate: filterForm.startDate,
+    endDate: filterForm.endDate
+  }
+  await orderStore.getUserOrdersList(
+    authStore.userId ?? 1,
+    'buyer',
+    currentPage.value,
+    pageSize.value,
+    activeName.value,
+    filterParams
+  )
+}
 //排序选项
 const sortOptions = [
   { label: '创建时间', value: 'created_at' },
@@ -57,6 +82,9 @@ const handleFilter = async () => {
     tabLoaded.value[key as keyof typeof tabLoaded.value] = false
   })
   
+  // 重置页码
+  currentPage.value = 1
+  
   // 准备筛选参数
   const filterParams = {
     keyword: filterForm.keyword,
@@ -67,29 +95,14 @@ const handleFilter = async () => {
   }
   
   // 重新加载当前tab的数据
-  if (activeName.value === 'pending') {
-    // pending 对应交易中，需要加载多个状态的订单
-    const statuses = ['confirmed', 'paid', 'shipped', 'delivered','pending']
-    for (const status of statuses) {
-      await orderStore.getUserOrdersList(
-        authStore.userId ?? 1,
-        'buyer',
-        1,
-        10,
-        status,
-        filterParams
-      )
-    }
-  } else {
-    await orderStore.getUserOrdersList(
-      authStore.userId ?? 1,
-      'buyer',
-      1,
-      10,
-      activeName.value,
-      filterParams
-    )
-  }
+  await orderStore.getUserOrdersList(
+    authStore.userId ?? 1,
+    'buyer',
+    currentPage.value,
+    pageSize.value,
+    activeName.value,
+    filterParams
+  )
   
   tabLoaded.value[activeName.value] = true
 }
@@ -97,6 +110,8 @@ const handleFilter = async () => {
 //处理点击tab
 const handleClick = async (tab: TabsPaneContext) => {
   const tabName = tab.paneName as TabName
+  // 切换tab时重置页码
+  currentPage.value = 1
 
   if (!tabLoaded.value[tabName]) {
     // 准备筛选参数
@@ -108,29 +123,15 @@ const handleClick = async (tab: TabsPaneContext) => {
       endDate: filterForm.endDate
     }
     
-    if (tabName === 'pending') {
-      // pending 对应交易中，需要加载多个状态的订单
-      const statuses = ['confirmed', 'paid', 'shipped', 'delivered','pending']
-      for (const status of statuses) {
-        await orderStore.getUserOrdersList(
-          authStore.userId ?? 1,
-          'buyer',
-          1,
-          10,
-          status,
-          filterParams
-        )
-      }
-    } else {
-      await orderStore.getUserOrdersList(
-        authStore.userId ?? 1,
-        'buyer',
-        1,
-        10,
-        tabName,
-        filterParams
-      )
-    }
+    await orderStore.getUserOrdersList(
+      authStore.userId ?? 1,
+      'buyer',
+      currentPage.value,
+      pageSize.value,
+      tabName,
+      filterParams
+    )
+    
     tabLoaded.value[tabName] = true
   }
 }
@@ -150,16 +151,20 @@ onMounted(() => {
 //具体订单内容
 const orderData = computed(()=>({
   all:orderStore?.orders,
-  pending:orderStore?.pendingOrdersList,
-  confirmed:orderStore?.confirmedOrdersList,
-  paid:orderStore?.paidOrdersList,
-  shipped:orderStore?.shippedOrdersList,
-  delivered:orderStore?.deliveredOrdersList,
-  completed:orderStore?.completedOrdersList,
+  pending:orderStore?.pendingOrdersList, // 待确认
+  confirmed:orderStore?.confirmedOrdersList, // 待付款 (paid + pending)
+  paid:orderStore?.paidOrdersList, // 待发货 (双paid)
+  shipped:orderStore?.shippedOrdersList, // 待运输 (运输员视角)
+  delivered:orderStore?.deliveredOrdersList, // 待收货 (运输员视角的已送达)
+  completed:orderStore?.completedOrdersList, // 待评价
 }))
 //订单、tab映射
 const getTabData = (tabName:string) => {
   return (orderData as any).value[tabName] || []
+}
+//检查订单是否为线下交易
+const isOfflineTradeOrder = (order: any) => {
+  return order.transaction_method && order.transaction_method === 'face_to_face'
 }
 //子组件展示判定
 const showModel = ref(false)
@@ -186,6 +191,9 @@ const handleCommentSuccess = async () => {
 }
 watch(activeName, async (newVal) => {
   if (!tabLoaded.value[newVal] && newVal !== 'all') {
+    // 切换tab时重置页码
+    currentPage.value = 1
+    
     // 准备筛选参数
     const filterParams = {
       keyword: filterForm.keyword,
@@ -197,8 +205,8 @@ watch(activeName, async (newVal) => {
     await orderStore.getUserOrdersList(
       authStore.userId ?? 1,
       'buyer',
-      1,
-      10,
+      currentPage.value,
+      pageSize.value,
       newVal,
       filterParams
     )
@@ -211,6 +219,15 @@ const goToBatchPayment = (row:any) => {
     query: {
       orderIds: row.id.toString(),  // 转换为字符串，因为支付页面用 split(',') 解析
       fromCart: 'false'
+    }
+  })
+}
+// 跳转到商品详情页
+const goToProductDetail = (row:any) => {
+  router.push({
+    name: 'product',
+    params: {
+      id: row.book_id.toString()
     }
   })
 }
@@ -271,7 +288,10 @@ const goToBatchPayment = (row:any) => {
           </el-table-column>
           <el-table-column label="图书名称">
             <template #default="scope">
-              <span style="font-weight: bold">{{ scope.row.book_snapshot?.title }}</span>
+              <div>
+                <span style="font-weight: bold">{{ scope.row.book_snapshot?.title }}</span>
+                <el-tag v-if="isOfflineTradeOrder(scope.row)" type="danger" size="small" effect="dark" style="margin-left: 10px; font-weight: bold;">线下交易</el-tag>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="图书价格">
@@ -296,11 +316,19 @@ const goToBatchPayment = (row:any) => {
           <el-table-column label="操作">
             <template #default="scope" style="position: relative">
               <el-button type="primary" @click="goToComment(scope.row)" v-if="scope.row.status === 'completed' && !isOrderReviewed(scope.row.id)">前往评论</el-button>
-              <el-button type="success" @click="goToBatchPayment(scope.row)" v-if="scope.row.status === 'pending' || scope.row.status === 'confirmed'">前往付款</el-button>
+              <el-button type="success" @click="goToProductDetail(scope.row)" v-if="scope.row.status === 'pending'">前往确认</el-button>
+              <el-button type="success" @click="goToBatchPayment(scope.row)" v-if="scope.row.status === 'paid' && scope.row.payment_status === 'pending'">前往付款</el-button>
             </template>
           </el-table-column>
         </el-table>
-        <el-pagination layout="prev, pager, next" :total="orderStore.pagination.total" style="margin-top: 16px"></el-pagination>
+        <el-pagination 
+          v-model:current-page="currentPage" 
+          :page-size="pageSize"
+          layout="prev, pager, next" 
+          :total="orderStore.pagination.total" 
+          style="margin-top: 16px"
+          @current-change="handleCurrentChange"
+        ></el-pagination>
       </el-tab-pane>
     </el-tabs>
     <reviews v-model:visible="showModel" :book_snapshot="currentBookSnapshot" :order-id="Number(currentOrderId)" :seller-id="currentSellerId" @confirm="handleCommentSuccess">

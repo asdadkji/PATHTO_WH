@@ -1,7 +1,8 @@
 // 前端发起请求的参数类型
 export interface UpdateUserRequest {
     username?: string;
-    avatarUrl?: string;
+    phone?: string;
+    avatar_url?: string;
     gender?: string;
     qq?: string;
     college?: string;

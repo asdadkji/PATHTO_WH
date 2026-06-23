@@ -44,7 +44,7 @@ export interface IOrder {
     id?: number
     order_number: string
     book_id: number
-    book_snapshot: Record<string, any>
+    book_snapshot: Record<string, any> | string
     buyer_id: number
     seller_id: number
     unit_price: number
@@ -54,13 +54,13 @@ export interface IOrder {
     final_price: number
     status: OrderStatus
     payment_method: PaymentMethod
-    payment_status: PaymentStatus
+    payment_status?: PaymentStatus
     payment_id?: string
     paid_at?: Date
     transaction_method: TransactionMethod
     meeting_location?: string
     meeting_time?: Date
-    shipping_address?: Record<string, any>
+    shipping_address?: Record<string, any> | string
     tracking_company?: string
     tracking_number?: string
     shipped_at?: Date
@@ -78,7 +78,7 @@ export interface IOrder {
 // API请求/响应类型
 export interface CreateOrderRequest {
     book_id: number
-    book_snapshot: Record<string, any>
+    book_snapshot: Record<string, any> | string
     seller_id: number
     quantity: number
     unit_price: number
@@ -88,7 +88,7 @@ export interface CreateOrderRequest {
     meeting_time?: string
     buyer_note?: string
     payment_method?: PaymentMethod
-    shipping_address?: Record<string, any>
+    shipping_address?: Record<string, any> | string
 }
 
 export interface UpdateOrderStatusRequest {
@@ -149,7 +149,11 @@ export const OrderModel = {
     //创建订单
     async createOrder(orderData:Omit<IOrder, 'id'>):Promise<IOrder> {
         const cleaned = Object.entries(orderData).reduce<Record<string, any>>((acc, [k, v]) => {
-            acc[k] = v === undefined ? null : v;
+            if (k === 'shipping_address' || k === 'book_snapshot') {
+                acc[k] = v === undefined ? null : (typeof v === 'string' ? v : JSON.stringify(v));
+            } else {
+                acc[k] = v === undefined ? null : v;
+            }
             return acc;
         }, {});
 
@@ -167,20 +171,62 @@ export const OrderModel = {
     async findOrderById(id:number):Promise<IOrder | null> {
         const sql = 'SELECT * FROM orders WHERE id = ?';
         const [rows] = await pool.query<OrderRow[]>(sql, [id]);
-        return rows[0]
+        if (!rows[0]) return null;
+        
+        // 解析 JSON 字段
+        const order = { ...rows[0] };
+        if (order.shipping_address && typeof order.shipping_address === 'string') {
+            try {
+                order.shipping_address = JSON.parse(order.shipping_address);
+            } catch (e) {
+                // 解析失败时保持原样
+            }
+        }
+        if (order.book_snapshot && typeof order.book_snapshot === 'string') {
+            try {
+                order.book_snapshot = JSON.parse(order.book_snapshot);
+            } catch (e) {
+                // 解析失败时保持原样
+            }
+        }
+        return order;
     },
     //根据订单号查询订单
     async findOrderByNumber(orderNumber: string):Promise<IOrder | null> {
         const sql = 'SELECT * FROM orders WHERE order_number = ?';
         const [rows] = await pool.query<RowDataPacket[]>(sql, [orderNumber]);
-        return (rows[0] as IOrder | undefined) || null;
+        if (!rows[0]) return null;
+        
+        const order = rows[0] as IOrder;
+        // 解析 JSON 字段
+        if (order.shipping_address && typeof order.shipping_address === 'string') {
+            try {
+                order.shipping_address = JSON.parse(order.shipping_address);
+            } catch (e) {}
+        }
+        if (order.book_snapshot && typeof order.book_snapshot === 'string') {
+            try {
+                order.book_snapshot = JSON.parse(order.book_snapshot);
+            } catch (e) {}
+        }
+        return order;
     },
     //更新订单
     async updateOrder(id:number,updateData:Partial<IOrder>):Promise<boolean> {
         const keys = Object.keys(updateData)
         if(keys.length === 0) return false
-        const setClause = keys.map(key => `${key} = ?`).join(',')
-        const values = [...Object.values(updateData),id]
+        
+        const cleaned = Object.entries(updateData).reduce<Record<string, any>>((acc, [k, v]) => {
+            if (k === 'shipping_address' || k === 'book_snapshot') {
+                acc[k] = v === undefined ? null : (typeof v === 'string' ? v : JSON.stringify(v));
+            } else {
+                acc[k] = v === undefined ? null : v;
+            }
+            return acc;
+        }, {});
+        
+        const setClause = Object.keys(cleaned).map(key => `${key} = ?`).join(',')
+        const values = [...Object.values(cleaned),id]
         const sql = `UPDATE orders SET ${setClause} WHERE id = ?`;
         const result = await pool.execute(sql, values);
         return (result as any).affectedRows > 0;
@@ -208,12 +254,31 @@ export const OrderModel = {
         }
         
         if(status && status !== 'all'){
-            whereClause += (whereClause ? ' AND' : ' WHERE') + ' status = ?'
-            params.push(status)
+            if(status === 'confirmed'){
+                // 待付款：status为paid，payment_status为pending
+                whereClause += (whereClause ? ' AND' : ' WHERE') + ' status = ? AND payment_status = ?'
+                params.push('paid', 'pending')
+            } else if(status === 'paid'){
+                // 待发货：status为paid，payment_status为paid
+                whereClause += (whereClause ? ' AND' : ' WHERE') + ' status = ? AND payment_status = ?'
+                params.push('paid', 'paid')
+            } else if(status === 'shipped'){
+                // 已发货：status为shipped
+                whereClause += (whereClause ? ' AND' : ' WHERE') + ' status = ?'
+                params.push('shipped')
+            } else {
+                // 其他状态直接匹配
+                whereClause += (whereClause ? ' AND' : ' WHERE') + ' status = ?'
+                params.push(status)
+            }
         } else if(status === 'all'){
-            // 当status为'all'时，返回所有状态的订单
-            whereClause += (whereClause ? ' AND' : ' WHERE') + ' status IN (?, ?, ?, ?, ?)'
-            params.push('confirmed', 'paid', 'shipped', 'delivered', 'completed')
+            // 当status为'all'时，商家角色返回除pending和confirmed之外的所有状态订单
+            // pending: status = 'pending'
+            // confirmed (待付款): status = 'paid' AND payment_status = 'pending'
+            if(userType === 'seller') {
+                whereClause += (whereClause ? ' AND' : ' WHERE') + ' status != ? AND NOT (status = ? AND payment_status = ?)'
+                params.push('pending', 'paid', 'pending')
+            }
         }
         if(startDate){
             whereClause += (whereClause ? ' AND' : ' WHERE') + ' created_at >= ?'
@@ -240,7 +305,24 @@ export const OrderModel = {
         const dataSql = `SELECT * FROM orders ${whereClause} ${orderByClause} LIMIT ? OFFSET ?`
         const dataParams = [...params, pageSize, offset]
         const [orderRows] = await pool.query<OrderRow[]>(dataSql, dataParams)
-        return {order:orderRows, page, page_size: pageSize, total}
+        
+        // 解析每个订单的 JSON 字段
+        const orders = orderRows.map(order => {
+            const parsedOrder = { ...order };
+            if (parsedOrder.shipping_address && typeof parsedOrder.shipping_address === 'string') {
+                try {
+                    parsedOrder.shipping_address = JSON.parse(parsedOrder.shipping_address);
+                } catch (e) {}
+            }
+            if (parsedOrder.book_snapshot && typeof parsedOrder.book_snapshot === 'string') {
+                try {
+                    parsedOrder.book_snapshot = JSON.parse(parsedOrder.book_snapshot);
+                } catch (e) {}
+            }
+            return parsedOrder;
+        });
+        
+        return {order: orders, page, page_size: pageSize, total}
     },
     //批量更新订单状态
     async updateOrderStatus(orderIds:number[], status:OrderStatus, data:Partial<IOrder>={}):Promise<boolean>{
@@ -269,17 +351,31 @@ export const OrderModel = {
         end_date?:Date
         buyer_name?:string
         buyer_phone?:string
+        status?:string
     }={},options:{
         page?:number
         pageSize?:number
-    }={}):Promise<{orders:IOrder[];total:number}>{
-        const {tracking_company,start_date,end_date,buyer_name,buyer_phone} = filter;
+    }={}):Promise<{orders:IOrder[];total:number}>{        
+        const {tracking_company,start_date,end_date,buyer_name,buyer_phone,status} = filter;
         const {page=1,pageSize=20} = options;
         const offset = (page - 1) * pageSize;
-        let whereClause = "WHERE status = 'shipped' AND transaction_method != 'face_to_face'";
+        let whereClause = "WHERE transaction_method != 'face_to_face'";
+        
+        // 根据状态筛选
+        if(status === 'shipped') {
+            // 待运输：status为shipped
+            whereClause += " AND status = 'shipped'";
+        } else if(status === 'delivered') {
+            // 待收货：status为delivered
+            whereClause += " AND status = 'delivered'";
+        } else {
+            // 默认：待运输和待收货
+            whereClause += " AND status IN ('shipped', 'delivered')";
+        }
+        
         const params:any[] = [];
         if(tracking_company){
-            whereClause += " AND tracking_company = ?";
+            whereClause += " AND tracking_company LIKE ?";
             params.push(`%${tracking_company}%`);
         }
         if(start_date){

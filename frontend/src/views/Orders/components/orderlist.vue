@@ -12,31 +12,214 @@ const orderStore = useOrderStore()
 import {useAuthStore} from "@/stores/auth.ts";
 const authStore = useAuthStore()
 //路由
-import {useRouter} from "vue-router";
+import {useRouter, useRoute} from "vue-router";
 const router = useRouter()
+const route = useRoute()
 //api
 import {createUserOrder} from "@/apis/services/order.ts";
 import {ElMessage} from "element-plus";
-import {toValue, onMounted} from "vue";
+import {toValue, onMounted, ref, watch} from "vue";
 
-// 初始化cartStore用户数据
-onMounted(() => {
-  console.log('orderlist onMounted - authStore.userId:', authStore.userId)
-  console.log('orderlist onMounted - cartStore.currentUserId:', cartStore.currentUserId)
-  console.log('orderlist onMounted - cartStore.selectedItems:', cartStore.selectedItems)
+// 保存创建好的订单ID
+const createdOrderIds = ref<string[]>([])
+// 标记订单是否已创建
+const ordersCreated = ref(false)
+
+// 生成购物车的唯一标识（用于防重复创建）
+const getCartIdentifier = () => {
+  if (!authStore.userId || cartStore.selectedItems.length === 0) {
+    return null
+  }
+  
+  const itemsKey = cartStore.selectedItems
+    .map(item => `${item.id}-${item.quantity}`)
+    .sort()
+    .join('_')
+  
+  return `cart_${authStore.userId}_${itemsKey}`
+}
+
+// 检查是否已经为当前购物车创建过订单
+const hasCreatedOrdersForCurrentCart = () => {
+  const identifier = getCartIdentifier()
+  if (!identifier) {
+    return false
+  }
+  
+  const saved = localStorage.getItem('order_created_carts')
+  if (!saved) {
+    return false
+  }
+  
+  const createdCarts = JSON.parse(saved)
+  return createdCarts.includes(identifier)
+}
+
+// 标记当前购物车已创建订单
+const markCartAsCreated = () => {
+  const identifier = getCartIdentifier()
+  if (!identifier) {
+    return
+  }
+  
+  let createdCarts: string[] = []
+  const saved = localStorage.getItem('order_created_carts')
+  if (saved) {
+    createdCarts = JSON.parse(saved)
+  }
+  
+  if (!createdCarts.includes(identifier)) {
+    createdCarts.push(identifier)
+    // 只保留最近10个，避免localStorage过大
+    if (createdCarts.length > 10) {
+      createdCarts = createdCarts.slice(-10)
+    }
+    localStorage.setItem('order_created_carts', JSON.stringify(createdCarts))
+    console.log('markCartAsCreated - 标记购物车:', identifier)
+  }
+}
+
+// 初始化cartStore用户数据并创建订单
+onMounted(async () => {
+  console.log('========== orderlist onMounted 开始 ==========')
+  console.log('route.query:', route.query)
+  console.log('authStore.userId:', authStore.userId)
+  console.log('cartStore.currentUserId:', cartStore.currentUserId)
+  console.log('cartStore.selectedItems.length:', cartStore.selectedItems.length)
+  console.log('cartStore.selectedItems:', cartStore.selectedItems)
+  console.log('ordersCreated.value:', ordersCreated.value)
   
   if (authStore.userId && cartStore.currentUserId !== String(authStore.userId)) {
     console.log('orderlist - 切换用户:', authStore.userId)
     cartStore.switchUser(String(authStore.userId))
     console.log('orderlist - 切换后 selectedItems:', cartStore.selectedItems)
   }
+
+  // 首先加载地址！！
+  if (authStore.userId) {
+    console.log('>>>>>>>>>>>> 加载地址 <<<<<<<<<<<<')
+    addressStore.getAddressList(authStore.userId)
+    console.log('addressStore.addressList:', addressStore.addressList)
+    
+    // 直接使用第一个地址作为默认选中
+    if (addressStore.addressList.length > 0 && !addressStore.selectedAddressId) {
+      addressStore.selectAddress(addressStore.addressList[0].id)
+      console.log('>>>>>>>>>>>> 默认选中第一个地址 <<<<<<<<<<<<')
+      console.log('addressStore.selectedAddressId:', addressStore.selectedAddressId)
+    }
+  }
+
+  // 检查是否有商品，如果有，进入页面时就创建订单
+  const alreadyCreated = hasCreatedOrdersForCurrentCart()
+  console.log('检查是否应该创建订单:', cartStore.selectedItems.length > 0, !ordersCreated.value, !alreadyCreated)
+  if (cartStore.selectedItems.length > 0 && !ordersCreated.value && !alreadyCreated) {
+    console.log('>>>>>>>>>>>> 准备调用 createOrdersOnEnter() <<<<<<<<<<<<')
+    await createOrdersOnEnter()
+  } else if (alreadyCreated) {
+    console.log('该购物车已创建过订单，跳过重复创建')
+    ElMessage.info('订单已存在，请继续完成支付')
+    // 尝试从后端获取当前用户的 pending 订单并恢复
+    if (authStore.userId) {
+      try {
+        await orderStore.getUserOrdersList(authStore.userId, 'buyer', 1, 100, '')
+        console.log('orderStore.orders:', orderStore.orders)
+        const pendingOrder = orderStore.orders.find(o => o.status === 'pending')
+        if (pendingOrder) {
+          orderStore.currentPendingOrderId = pendingOrder.id
+          createdOrderIds.value = [String(pendingOrder.id)]
+          ordersCreated.value = true
+          console.log('恢复 pending 订单成功:', pendingOrder.id)
+        }
+      } catch (e) {
+        console.error('获取订单列表失败:', e)
+      }
+    }
+  } else {
+    console.log('未满足创建订单条件')
+  }
+  console.log('========== orderlist onMounted 结束 ==========')
 })
 
-//提交订单
-const handleSubmitOrder = async () => {
-  console.log('handleSubmitOrder - selectedItems:', cartStore.selectedItems)
+// 进入页面时创建订单
+const createOrdersOnEnter = async () => {
+  console.log('========== createOrdersOnEnter 开始 ==========')
+  console.log('createOrdersOnEnter - selectedItems:', cartStore.selectedItems)
+  console.log('createOrdersOnEnter - selectedItems.length:', cartStore.selectedItems.length)
+  console.log('createOrdersOnEnter - addressStore.selectedAddressId:', addressStore.selectedAddressId)
+  console.log('createOrdersOnEnter - addressStore.addressList:', addressStore.addressList)
+  
   if (cartStore.selectedItems.length === 0) {
-    ElMessage.warning('请选择商品')
+    console.log('createOrdersOnEnter - 没有选中商品，直接返回')
+    return
+  }
+  
+  // 如果没有选中地址，使用第一个地址
+  if (!addressStore.selectedAddressId) {
+    if (addressStore.addressList.length > 0) {
+      console.log('createOrdersOnEnter - 没有选中地址，使用第一个地址')
+      addressStore.selectAddress(addressStore.addressList[0].id)
+    } else {
+      console.log('createOrdersOnEnter - 没有可用地址，等待用户选择')
+      return
+    }
+  }
+  
+  // 获取选中的地址信息
+  const selectedAddress = addressStore.getAddressById(Number(addressStore.selectedAddressId))
+  if (!selectedAddress) {
+    console.log('createOrdersOnEnter - 选中的地址不存在')
+    return
+  }
+  
+  console.log('createOrdersOnEnter - 使用地址:', selectedAddress)
+  
+  console.log('createOrdersOnEnter - 准备构建 paramsList')
+  const paramsList = toValue(cartStore.selectedItems).map(item => ({
+    book_id: Number(item.id),
+    book_snapshot: item as Record<string, any>,
+    seller_id: Number(item.seller_id),
+    quantity: Number(item.quantity),
+    unit_price: Number(item.price),
+    delivery_fee: 4,
+    payment_method: 'alipay',
+    shipping_address: addressStore.getFormattedAddress(Number(addressStore.selectedAddressId)),
+  }))
+  console.log('createOrdersOnEnter - paramsList:', paramsList)
+
+  try {
+    console.log('>>>>>>>>>>>> 调用 orderStore.batchCreateUserOrder() <<<<<<<<<<<<')
+    const createdOrders = await orderStore.batchCreateUserOrder(
+      authStore?.userId ?? 1,
+      paramsList,
+      { transaction_method: 'express' }
+    )
+    console.log('createOrdersOnEnter - batchCreateUserOrder 返回:', createdOrders)
+    if (createdOrders.length > 0) {
+      createdOrderIds.value = createdOrders.map(o => String(o.id))
+      ordersCreated.value = true
+      orderStore.currentPendingOrderId = createdOrders[0].id
+      markCartAsCreated()
+      console.log('createOrdersOnEnter - 订单创建成功:', createdOrderIds.value)
+      console.log('createOrdersOnEnter - 设置 currentPendingOrderId:', createdOrders[0].id)
+    }
+  } catch (e: any) {
+    console.error('createOrdersOnEnter - 创建订单失败:', e)
+    ElMessage.error(e.message || '创建订单失败')
+  }
+  console.log('========== createOrdersOnEnter 结束 ==========')
+}
+
+//提交订单 - 跳转到支付页面
+const handleSubmitOrder = async () => {
+  console.log('handleSubmitOrder - createdOrderIds:', createdOrderIds.value)
+  
+  // 如果订单还没创建，先创建
+  if (createdOrderIds.value.length === 0) {
+    await createOrdersOnEnter()
+  }
+  
+  if (createdOrderIds.value.length === 0) {
+    ElMessage.error('订单创建失败，请重试')
     return
   }
   
@@ -46,60 +229,22 @@ const handleSubmitOrder = async () => {
     return
   }
   
-  // 获取选中的地址信息
-  const selectedAddress = addressStore.getAddressById(Number(addressStore.selectedAddressId))
-  if (!selectedAddress) {
-    ElMessage.error('选中的地址不存在')
-    return
-  }
-  
-  // 确保地址已保存到addressStore中
-  if (!addressStore.addressList.some(addr => addr.id === selectedAddress.id)) {
-    try {
-      await addressStore.addAddress({
-        userId: authStore?.userId ?? 1,
-        username: selectedAddress.username,
-        phone: selectedAddress.phone,
-        address: selectedAddress.address,
-        isDefault: selectedAddress.isDefault
-      })
-    } catch (e) {
-      console.error('保存地址失败:', e)
-    }
-  }
-  
-  const paramsList = toValue(cartStore.selectedItems).map(item => ({
-    book_id: Number(item.id),
-    book_snapshot: item as Record<string, any>,
-    seller_id: Number(item.merchantId),
-    quantity: Number(item.quantity),
-    unit_price: Number(item.price),
-    delivery_fee: 4,
-    payment_method: 'alipay',
-    shipping_address: addressStore.getFormattedAddress(Number(addressStore.selectedAddressId)),
-  }))
-
-  try {
-    const createdOrders = await orderStore.batchCreateUserOrder(
-      authStore?.userId ?? 1,
-      paramsList,
-      { transaction_method: 'express' }
-    )
-    if (!createdOrders.length) throw new Error('未生成任何订单')
-
-    const orderIds = createdOrders.map(o => o.id).join(',')
-
-    await router.push({
-      name: 'checkout',
-      query: {
-        orderIds,
-        fromCart: 'true'
-      },
-    })
-  } catch (e: any) {
-    ElMessage.error(e.message || '下单失败')
-  }
+  // 跳转到支付页面
+  await router.push({
+    name: 'checkout',
+    query: {
+      orderIds: createdOrderIds.value.join(','),
+      fromCart: route.query.fromCart === 'true' ? 'true' : undefined
+    },
+  })
 }
+
+// 监听购物车商品变化，当商品变化时允许再次创建订单
+watch(() => cartStore.selectedItems.length, () => {
+  // 这里可以添加更精细的逻辑，比如当商品数量或种类变化时清除标记
+  // 为了简单起见，这里暂不自动清除，让用户手动触发
+  console.log('购物车商品数量变化')
+})
 </script>
 
 <template>

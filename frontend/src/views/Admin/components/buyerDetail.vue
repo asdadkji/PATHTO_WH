@@ -86,7 +86,10 @@ const handleUnban = async () => {
           <span>{{ adminStore.buyerDetail.username }}</span>
         </el-form-item>
         <el-form-item label="手机号">
-          <span>{{ adminStore.buyerDetail.phone }}</span>
+          <span v-if="adminStore.buyerDetail.phone">
+            {{ adminStore.buyerDetail.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') }}
+          </span>
+          <span v-else>无</span>
         </el-form-item>
         <el-form-item label="邮箱">
           <span>{{ adminStore.buyerDetail.email }}</span>

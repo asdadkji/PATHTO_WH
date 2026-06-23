@@ -47,8 +47,8 @@ const matched = computed(() => route.matched.filter(r => r.meta && r.meta.title)
                 <span>图书管理</span>
               </template>
               <el-menu-item-group title="图书操作">
-                <el-menu-item index="/seller/addPro">添加图书</el-menu-item>
-                <el-menu-item index="/seller/disProduct">上架图书管理</el-menu-item>
+                <el-menu-item index="/seller/addPro">图书上架管理</el-menu-item>
+                <el-menu-item index="/seller/disProduct">图书下架管理</el-menu-item>
                 <el-menu-item index="/seller/bookReviewProcess">图书审查流程</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>

@@ -1,5 +1,5 @@
 //图书服务
-import {BookModel} from "@/models/Book";
+import {BookModel} from "../models/Book";
 
 export const BookService = {
     //筛选页
@@ -60,13 +60,19 @@ export const BookService = {
                 return {code:1, message:'图书不存在'}
             }
             // @ts-ignore
-            if(book.status === 'expired') {
+            if(book.status === 'pending') {
                 return {code:1, message:'图书已下架'}
             }
             const result = await BookModel.deleteBook(bookId,merchantId);
-            return result;
+            // 检查受影响行数
+            // @ts-ignore
+            if (result.affectedRows === 0) {
+                return {code:1, message:'下架失败'}
+            }
+            return {code:0, message:'下架成功'};
         } catch (e) {
-            console.log('下架失败',e)
+            console.log('下架失败',e);
+            return {code:1, message:'下架失败'};
         }
     },
     //商家图书展示
@@ -90,5 +96,27 @@ export const BookService = {
             console.log('更新线下交易设置失败', e);
             throw e;
         }
+    },
+    // 获取所有图书
+    async getAllBooks(opts: {
+        page: number,
+        pageSize: number,
+        keyword?: string,
+        categoryId?: number,
+        status?: string,
+        author?: string
+    }) {
+        const books = await BookModel.getAllBooks(opts);
+        return books;
+    },
+    // 下架图书
+    async removeBook(bookId: number) {
+        const result = await BookModel.removeBook(bookId);
+        return result;
+    },
+    // 上架图书
+    async publishBook(bookId: number) {
+        const result = await BookModel.publishBook(bookId);
+        return result;
     }
 }

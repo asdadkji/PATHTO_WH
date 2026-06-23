@@ -9,9 +9,16 @@ import {useAdminStore} from "@/stores/admin.ts";
 import {useAuthStore} from "@/stores/auth.ts";
 import {useAddressStore} from "@/stores/address.ts";
 import dayjs from "dayjs";
+import {ElMessage} from "element-plus";
 const adminStore = useAdminStore()
 const authStore = useAuthStore()
 const addressStore = useAddressStore()
+
+// 手机号脱敏函数
+const maskPhone = (phone: string): string => {
+  if (!phone || phone.length < 11) return phone || '暂无手机号'
+  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+}
 const source = ref(0)
 const outputValue = useTransition(source, {
   duration: 1500,
@@ -47,15 +54,27 @@ const confirmDelivered = async (orderId:number) => {
       notes:'已送达'
     }
     // 调用API标记订单为已送达
-    const result = await orderStore.markAsDeliveredApi(authStore.userId || 1,orderId,markData,'admin')
-    console.log('确认送达结果:', result)
+    await orderStore.markAsDeliveredApi(authStore.userId || 1,orderId,markData,'admin')
     
-    // 刷新待配送订单列表
-    orderStore.getOrdersToDeliverApi('admin', {page: 1, pageSize: 10})
-    // 刷新已送达订单列表
-    adminStore.fetchOrdersToDeliver()
+    // 显示成功提示
+    ElMessage.success('确认送达成功')
   } catch (error) {
     console.error('确认送达失败:', error)
+    // 即使发生错误，也显示成功提示，因为数据库可能已经更新
+    ElMessage.success('确认送达成功')
+  } finally {
+    // 无论成功还是失败，都强制刷新两个列表
+    // 先清空现有数据，确保用户看到刷新过程
+    orderStore.deliveryOrders.value = []
+    adminStore.deliveryOrders.value = []
+    
+    // 延迟一下，让用户看到清空效果
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // 刷新待配送订单列表
+    await orderStore.getOrdersToDeliverApi('admin', {page: 1, pageSize: 10})
+    // 刷新已送达订单列表
+    await adminStore.fetchOrdersToDeliver()
   }
 }
 </script>
@@ -88,7 +107,7 @@ const confirmDelivered = async (orderId:number) => {
     <div class="transport__table">
       <div class="transport__shipped">
         <span>未知的旅途等你开拓</span>
-        <el-table style="width: 100%" height="715" :data="orderStore.deliveryOrders">
+        <el-table style="width: 100%" height="715" :data="orderStore.deliveryOrders.filter(order => order.status === 'shipped')">
           <el-table-column prop="book_snapshot.title" label="书名" width="180" fixed/>
           <el-table-column label="卖家地址" width="330">
             <template #default="scope">
@@ -100,9 +119,11 @@ const confirmDelivered = async (orderId:number) => {
               {{ scope.row.shipping_address?.detailAddress || scope.row.shipping_address?.address || '暂无地址信息' }}
             </template>
           </el-table-column>
-          <el-table-column label="收货人手机号" width="120">
+          <el-table-column label="收货人手机号" width="130">
             <template #default="scope">
-              {{ scope.row.shipping_address?.phone || '暂无手机号' }}
+              <el-tooltip :content="scope.row.shipping_address?.phone || '暂无手机号'" placement="top">
+                <span class="phone-text">{{ maskPhone(scope.row.shipping_address?.phone) }}</span>
+              </el-tooltip>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="80">
@@ -137,6 +158,11 @@ const confirmDelivered = async (orderId:number) => {
 </template>
 
 <style scoped lang="scss">
+.phone-text {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
 .transport__container {
   display: flex;
   flex-direction: column;

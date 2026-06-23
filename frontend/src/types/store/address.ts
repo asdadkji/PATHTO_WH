@@ -7,4 +7,5 @@ export interface updateAddress {
   phone?:number
   address?:string
   isDefault?:boolean
+  isShippingAddress?:boolean
 }

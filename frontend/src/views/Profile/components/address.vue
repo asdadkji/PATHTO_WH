@@ -55,11 +55,21 @@ const handleSubmit = (formData:any) => {
   </div>
   <el-table :data="addressStore?.addressList" style="width: 100%" border>
     <el-table-column label="收货人" property="username"></el-table-column>
-    <el-table-column label="手机" property="phone"></el-table-column>
+    <el-table-column label="手机">
+      <template #default="scope">
+        {{ scope.row.phone.toString().replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') }}
+      </template>
+    </el-table-column>
     <el-table-column label="地区">
-      <span>金陵科技学院</span>
+      <span>某某大学</span>
     </el-table-column>
     <el-table-column label="详细地址" property="address" show-overflow-tooltip></el-table-column>
+    <el-table-column label="标识">
+      <template #default="scope">
+        <el-tag v-if="scope.row.isDefault" type="success" size="small">默认收货地址</el-tag>
+        <el-tag v-if="scope.row.isShippingAddress" type="warning" size="small" style="margin-left: 8px">发货地址</el-tag>
+      </template>
+    </el-table-column>
     <el-table-column label="操作">
       <template #default="{row}">
         <el-button link type="primary" size="small" @click="openEditForm(row)">编辑</el-button>

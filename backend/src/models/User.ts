@@ -29,6 +29,7 @@ export const UserModel = {
     //修改/保存
     async update(id:number, updateData:{
         username?:string
+        phone?:string
         qq?:string
         student_id?:string
         avatar_url?:string

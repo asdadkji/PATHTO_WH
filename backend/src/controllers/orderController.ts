@@ -5,6 +5,9 @@ import {orderService} from "@/services/orderService";
 export const OrderController = {
     //创建订单
     async createUserOrder(req: Request, res: Response) {
+        console.log('========== 后端 OrderController.createUserOrder 开始 ==========')
+        console.log('req.params:', req.params)
+        console.log('req.body:', req.body)
         try {
             const userId = req.params.userId;
             if(!userId) {
@@ -14,11 +17,14 @@ export const OrderController = {
             const {body} = req;
             const requiredFields = ['book_id', 'seller_id', 'unit_price', 'quantity', 'transaction_method'];
             const missingFields = requiredFields.filter(field => !body[field]);
+            console.log('missingFields:', missingFields)
             if(missingFields.length > 0) {
                 res.status(400).json({code:1, message: `Missing required fields: ${missingFields.join(', ')}`});
                 return;
             }
+            console.log('调用 orderService.createOrder')
             const result = await orderService.createOrder(Number(userId), body);
+            console.log('orderService.createOrder 返回:', result)
             if(result) {
                 res.status(200).json({code:0, message: 'success', data: result});
             } else {
@@ -28,6 +34,40 @@ export const OrderController = {
             console.log('创建订单失败',e);
             res.status(500).json({code:1, message: 'create order failed'});
         }
+        console.log('========== 后端 OrderController.createUserOrder 结束 ==========')
+    },
+    //更新订单收货地址
+    async updateOrderAddress(req: Request, res: Response) {
+        console.log('========== 后端 OrderController.updateOrderAddress 开始 ==========')
+        try {
+            const { userId, orderId } = req.params;
+            const { shipping_address } = req.body;
+            
+            if (!userId || !orderId) {
+                res.status(400).json({code:1, message: 'Missing userId or orderId'});
+                return;
+            }
+            
+            if (!shipping_address) {
+                res.status(400).json({code:1, message: 'Missing shipping_address'});
+                return;
+            }
+            
+            console.log('updateOrderAddress - userId:', userId, 'orderId:', orderId)
+            console.log('updateOrderAddress - shipping_address:', shipping_address)
+            
+            const result = await orderService.updateOrderAddress(Number(orderId), shipping_address);
+            
+            if (result) {
+                res.status(200).json({code:0, message: 'Address updated successfully', data: result});
+            } else {
+                res.status(500).json({code:1, message: 'Update address failed'});
+            }
+        } catch (e) {
+            console.error('更新订单地址失败', e);
+            res.status(500).json({code:1, message: 'Update address failed'});
+        }
+        console.log('========== 后端 OrderController.updateOrderAddress 结束 ==========')
     },
     //获取用户订单列表
     async getUserOrders(req: Request, res: Response) {
@@ -126,6 +166,30 @@ export const OrderController = {
             res.status(500).json({code:1, message: 'Internal server error'});
         }
     },
+    //进入支付页面
+    async enterPaymentPage(req:Request,res:Response) {
+        try {
+            const userId = Number(req.params.userId);
+            const orderId = parseInt(req.params.orderId);
+            if(isNaN(orderId)) {
+                res.status(400).json({code:1, message: 'Invalid order id'});
+                return;
+            }
+            if(!userId) {
+                res.status(400).json({code:1, message: 'Invalid user id'});
+                return;
+            }
+            const updatedOrder = await orderService.enterPaymentPage(orderId, userId);
+            if(updatedOrder) {
+                res.status(200).json({code:0, message: 'Enter payment page successfully', data: updatedOrder});
+            } else {
+                res.status(404).json({code:1, message: 'Order not found'});
+            }
+        } catch (e) {
+            console.error('Enter payment page error:', e);
+            res.status(500).json({code:1, message: 'Internal server error', error: (e as Error).message});
+        }
+    },
     //支付
     async processPayment(req:Request,res:Response) {
         try {
@@ -147,10 +211,12 @@ export const OrderController = {
             const updatedOrder = await orderService.payOrder(orderId,userId,payment_method,payment_id);
             if(updatedOrder) {
                 res.status(200).json({code:0, message: 'Order payment processed successfully'});
+            } else {
+                res.status(404).json({code:1, message: 'Order not found'});
             }
         } catch (e) {
-            console.log(e);
-            res.status(500).json({code:1, message: 'Internal server error'});
+            console.error('Payment error:', e);
+            res.status(500).json({code:1, message: 'Internal server error', error: (e as Error).message});
         }
     },
     //卖家发货
@@ -216,10 +282,11 @@ export const OrderController = {
             const end_date = req.query.end_date as Date | undefined;
             const buyer_name = req.query.buyer_name as string | undefined;
             const buyer_phone = req.query.buyer_phone as string | undefined;
+            const status = req.query.status as string | undefined;
             const page = parseInt(req.query.page as string);
             const pageSize = parseInt(req.query.pageSize as string);
             const result = await orderService.deliveredOrderList(
-                {tracking_company,start_date,end_date,buyer_name,buyer_phone},
+                {tracking_company,start_date,end_date,buyer_name,buyer_phone,status},
                 {page, pageSize});
             if(result) {
                 res.status(200).json({code:0, message: '获取成功', data: result});

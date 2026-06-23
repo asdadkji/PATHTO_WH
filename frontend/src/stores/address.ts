@@ -43,6 +43,10 @@ export const useAddressStore = defineStore('address', () => {
   const defaultAddress = () => {
     return addressList.find(address => address.isDefault) || null
   }
+  //发货地址
+  const shippingAddress = () => {
+    return addressList.find(address => address.isShippingAddress) || addressList[0] || null
+  }
   //新增地址
   const addAddress = async (data:Omit<updateAddress, 'id'>) => {
     try {
@@ -52,6 +56,11 @@ export const useAddressStore = defineStore('address', () => {
       if (data.isDefault) {
         addressList.forEach(addr => {
           addr.isDefault = false
+        })
+      }
+      if (data.isShippingAddress) {
+        addressList.forEach(addr => {
+          addr.isShippingAddress = false
         })
       }
       const newAddress:updateAddress = {
@@ -79,6 +88,13 @@ export const useAddressStore = defineStore('address', () => {
       addressList.forEach(addr => {
         if(addr.id !== addressId) {
           addr.isDefault = false
+        }
+      })
+    }
+    if(updateData.isShippingAddress) {
+      addressList.forEach(addr => {
+        if(addr.id !== addressId) {
+          addr.isShippingAddress = false
         }
       })
     }
@@ -211,5 +227,6 @@ export const useAddressStore = defineStore('address', () => {
     saveToLocalStorage,
     getFormattedAddress,
     getAddressById,
+    shippingAddress,
   }
 })

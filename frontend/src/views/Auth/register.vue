@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
-import { type FormItemRule} from "element-plus";
+import { type FormItemRule, type FormInstance } from "element-plus";
 //引入auth仓库
 import {useAuthStore} from "@/stores/auth.ts";
 const authStore = useAuthStore();
@@ -86,6 +86,8 @@ const form = reactive<FormShape>(fields.reduce<Record<string, string | boolean>>
   obj[f.key] = f.type === 'checkbox' ? false : ''
   return obj
 }, {}))
+//表单ref
+const formRef = ref<FormInstance>()
 //表单验证规则
 const rules = computed<RulesMap>(() => fields.reduce<RulesMap>((obj, f) => {
     obj[f.key] = f.rules
@@ -93,21 +95,26 @@ const rules = computed<RulesMap>(() => fields.reduce<RulesMap>((obj, f) => {
   }, {}))
 //提交表单
 const submit = async () => {
-  if (!form.smsCode || !validate(form.smsCode as string)) {
-    alert('请先获取短信验证码或验证码错误')
-    return
-  }
-  const formData = {
-    username: form.username,
-    password: form.password,
-    phone: Number(form.mobile)
-  }
+  if (!formRef.value) return
   try {
+    await formRef.value.validate()
+    if (!form.smsCode || !validate(form.smsCode as string)) {
+      alert('请先获取短信验证码或验证码错误')
+      return
+    }
+    const formData = {
+      username: form.username,
+      password: form.password,
+      phone: Number(form.mobile)
+    }
     await authStore.registerAction(formData)
     alert('注册成功')
     await router.push('/auth/login')
   } catch (e:any) {
-    alert(e.message || '注册失败')
+    // 表单验证失败时，Element Plus会自动显示错误信息
+    if (e.message !== 'Validation failed') {
+      alert(e.message || '注册失败')
+    }
   }
 }
 //验证码模块
@@ -131,6 +138,9 @@ const startCountdown = () => {
     if (remaining.value <= 0){
       clearTimeout(timer)
       code.value = ''
+    } else {
+      // 继续倒计时
+      startCountdown()
     }
   },1000)
 }
@@ -145,6 +155,7 @@ const startCountdown = () => {
     </div>
     <!--表单-->
     <el-form
+      ref="formRef"
       class="register__form"
       :model="form"
       :rules="rules"
@@ -162,10 +173,10 @@ const startCountdown = () => {
         <el-input
           v-if="f.type === 'input' || f.type === 'password'"
           v-model="form[f.key]"
-          :type="f.type"
+          :type="f.type === 'input' && f.key === 'mobile' ? 'text' : f.type"
           :placeholder="f.placeholder"
           :maxlength="f.maxlength"
-          :show-password="f.type === 'password'"
+          :show-password="f.type === 'password' || f.key === 'mobile'"
           clearable
         >
           <!--短信验证码插槽-->

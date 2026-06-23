@@ -4,12 +4,16 @@ import {OrderController} from "@/controllers/orderController";
 export const orderRouter = Router();
 //创建订单
 orderRouter.post("/create/:userId", OrderController.createUserOrder);
+//更新订单收货地址
+orderRouter.put("/:userId/:orderId/address", OrderController.updateOrderAddress);
 //获取用户订单列表
 orderRouter.get("/list/:userId", OrderController.getUserOrders);
 //更新订单状态
 orderRouter.put("/:userId/:orderId/status", OrderController.updateUserOrderStatus)
 //取消订单
 orderRouter.post("/:userId/:orderId/cancel", OrderController.cancelOrder);
+//进入支付页面
+orderRouter.post("/:userId/:orderId/enterPayment", OrderController.enterPaymentPage);
 //支付
 orderRouter.post("/:userId/:orderId/pay", OrderController.processPayment);
 //卖家发货

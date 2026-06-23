@@ -48,13 +48,30 @@ const tabs = ref([
   {label:'待确认',name:'pending'},
   {label:'待付款',name:'confirmed'},
   {label:'待发货',name:'paid'},
+  {label:'待运输',name:'shipped'},
   {label:'待收货',name:'delivered'},
   {label:'待评价',name:'completed'},
   {label:'已取消',name:'cancelled'}
 ])
 const activeName = ref("all")
+//分页配置
+const currentPage = ref(1)
+const pageSize = ref(10)
+
 const handleClick = (tab: TabsPaneContext) => {
-  orderStore.getUserOrdersList(0, 'admin', 1, 10, tab.paneName as string)
+  currentPage.value = 1
+  orderStore.getUserOrdersList(0, 'admin', currentPage.value, pageSize.value, tab.paneName as string)
+}
+//处理页码变化
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  orderStore.getUserOrdersList(0, 'admin', page, pageSize.value, activeName.value)
+}
+//处理每页条数变化
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  orderStore.getUserOrdersList(0, 'admin', 1, size, activeName.value)
 }
 //订单列表初始化
 onMounted(() => {
@@ -80,8 +97,8 @@ const handleCancelOrder = async (orderId:number) => {
   try {
     await orderStore.cancelOrderApi(authStore.userId || 0, Number(orderId), 'admin')
     alert('订单已取消')
-    // 重新获取订单列表
-    orderStore.getUserOrdersList(0, 'admin', 1, 10, activeName.value)
+    // 重新获取订单列表，使用当前分页参数
+    orderStore.getUserOrdersList(0, 'admin', currentPage.value, pageSize.value, activeName.value)
   } catch (e:any) {
     alert(e.message || '取消订单失败')
   }
@@ -170,7 +187,7 @@ watch(()=>orderStore.orders,(newVal)=>{
                   'pending': '待确认',
                   'confirmed': '待付款',
                   'paid': '待发货',
-                  'shipped': '已发货',
+                  'shipped': '待运输',
                   'delivered': '待收货',
                   'completed': '已完成',
                   'cancelled': '已取消'
@@ -203,7 +220,16 @@ watch(()=>orderStore.orders,(newVal)=>{
             </template>
           </el-table-column>
         </el-table>
-        <el-pagination layout="prev, pager, next" :total="orderStore.pagination.total" style="margin-top: 16px"></el-pagination>
+        <el-pagination
+          v-model:current-page="currentPage"
+          :page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next"
+          :total="orderStore.pagination.total"
+          style="margin-top: 16px"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        ></el-pagination>
       </el-tab-pane>
     </el-tabs>
 
@@ -230,7 +256,7 @@ watch(()=>orderStore.orders,(newVal)=>{
                 'pending': '待确认',
                 'confirmed': '待付款',
                 'paid': '待发货',
-                'shipped': '已发货',
+                'shipped': '待运输',
                 'delivered': '待收货',
                 'completed': '已完成',
                 'cancelled': '已取消'

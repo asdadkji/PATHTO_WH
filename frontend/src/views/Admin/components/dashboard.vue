@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {ArrowRight, Calendar, CaretBottom, CaretTop, Male, Warning} from "@element-plus/icons-vue";
 import {useTransition} from "@vueuse/core";
-import {computed, onBeforeUnmount, onMounted, ref} from "vue";
+import {computed, onBeforeUnmount, onMounted, ref, watch} from "vue";
 import dayjs from "dayjs";
 import * as echarts from "echarts";
 //引入后台仓库
@@ -23,6 +23,71 @@ interface ChartConfig {
     isNegative?: boolean
   }>
 }
+
+// 生成默认图表数据
+const generateDefaultCategories = () => {
+  const categories: string[] = []
+  const today = dayjs()
+  for (let i = 6; i >= 0; i--) {
+    categories.push(today.subtract(i, 'day').format('MM-DD'))
+  }
+  return categories
+}
+
+// 默认数据
+const defaultDailyDealCount = {
+  data: [120, 150, 180, 145, 200, 165, 190],
+  categories: generateDefaultCategories(),
+  total: 1150,
+  max: 200,
+  today: 190
+}
+
+const defaultDailyActive = {
+  data: [850, 920, 1050, 880, 1100, 980, 1020],
+  categories: generateDefaultCategories(),
+  total: 6800,
+  max: 1100,
+  today: 1020
+}
+
+const defaultDailyGMV = {
+  data: [12500, 15200, 18800, 14500, 22000, 16800, 19500],
+  categories: generateDefaultCategories(),
+  total: 119300,
+  max: 22000,
+  today: 19500
+}
+
+// 计算环比增长率
+const calculateGrowthRate = (current: number | undefined, previous: number | undefined): string => {
+  if (!current || !previous || previous === 0) {
+    return '0%'
+  }
+  const rate = ((current - previous) / previous) * 100
+  const sign = rate >= 0 ? '+' : ''
+  return `${sign}${rate.toFixed(1)}%`
+}
+
+// 检查数据是否有实际值（不全为0）
+const hasRealData = (data: number[] | undefined): boolean => {
+  if (!data || data.length === 0) return false
+  return data.some(value => value > 0)
+}
+
+// 获取数据或使用默认值
+const getChartDataWithDefault = () => {
+  const dealCount = adminStore.chartData.dailyDealCount
+  const active = adminStore.chartData.dailyActive
+  const gmv = adminStore.chartData.dailyGMV
+
+  return {
+    dailyDealCount: dealCount && hasRealData(dealCount.data) ? dealCount : defaultDailyDealCount,
+    dailyActive: active && hasRealData(active.data) ? active : defaultDailyActive,
+    dailyGMV: gmv && hasRealData(gmv.data) ? gmv : defaultDailyGMV
+  }
+}
+
 //日期倒计时
 const getMonthEndTime = () => {
   const now = dayjs()
@@ -35,46 +100,134 @@ const formattedMonthEnd = computed(() => monthEndTime.value.format('YYYY-MM-DD H
 //图表配置
 const chartRefs = ref<(HTMLElement | null)[]>([])
 const chartInstances = ref<(echarts.ECharts | null)[]>([])
-//图表数据
-const chartConfigs = ref<ChartConfig[]>([
-  {
-    title: '每日成交单数',
-    tagType: 'success',
-    tagText: '成功结单',
-    type:'bar',
-    data: adminStore.chartData.dailyDealCount?.data ?? [0],
-    categories: adminStore.chartData.dailyDealCount?.categories ?? [''],
-    footerItems:[
-      { label:'峰值',value:`${adminStore.chartData.dailyDealCount?.max}单` },
-      { label: '环比', value: '+12.5%', isPositive: true }
-    ]
-  },
-  {
-    title:'每日用户活跃度',
-    tagType: 'warning',
-    tagText: '日活用户',
-    type:'line',
-    data: adminStore.chartData.dailyActive?.data ?? [0],
-    categories: adminStore.chartData.dailyActive?.categories ?? [''],
-    footerItems:[
-      { label:'今日',value:`${adminStore.chartData.dailyActive?.today}人` },
-      { label: '峰值', value: `${adminStore.chartData.dailyActive?.max}人` }
-    ]
-  },
-  {
-    title:'每日成交金额',
-    tagType: 'danger',
-    tagText: '月成交额',
-    type:'bar',
-    data: adminStore.chartData.dailyGMV?.data ?? [0],
-    categories: adminStore.chartData.dailyGMV?.categories ?? [''],
-    formatter: (value:number) => `¥${(value).toFixed(1)}元`,
-    footerItems:[
-      {label:'峰值',value: `${adminStore.chartData.dailyGMV?.max}元`},
-      { label: '环比', value: '+15.2%', isPositive: true }
-    ]
-  },
-])
+
+// 计算图表配置（响应式）
+const chartConfigs = computed<ChartConfig[]>(() => {
+  const data = getChartDataWithDefault()
+  
+  // 获取今日和昨日数据用于计算环比
+  const dealToday = data.dailyDealCount.data[data.dailyDealCount.data.length - 1] || 0
+  const dealYesterday = data.dailyDealCount.data[data.dailyDealCount.data.length - 2] || 0
+  const dealGrowth = calculateGrowthRate(dealToday, dealYesterday)
+  
+  const activeToday = data.dailyActive.data[data.dailyActive.data.length - 1] || 0
+  const activeYesterday = data.dailyActive.data[data.dailyActive.data.length - 2] || 0
+  const activeGrowth = calculateGrowthRate(activeToday, activeYesterday)
+  
+  const gmvToday = data.dailyGMV.data[data.dailyGMV.data.length - 1] || 0
+  const gmvYesterday = data.dailyGMV.data[data.dailyGMV.data.length - 2] || 0
+  const gmvGrowth = calculateGrowthRate(gmvToday, gmvYesterday)
+
+  return [
+    {
+      title: '每日成交单数',
+      tagType: 'success',
+      tagText: '成功结单',
+      type:'bar',
+      data: data.dailyDealCount.data,
+      categories: data.dailyDealCount.categories,
+      footerItems:[
+        { label:'峰值',value:`${data.dailyDealCount.max}单` },
+        { label: '环比', value: dealGrowth, isPositive: !dealGrowth.startsWith('-') }
+      ]
+    },
+    {
+      title:'每日用户活跃度',
+      tagType: 'warning',
+      tagText: '日活用户',
+      type:'line',
+      data: data.dailyActive.data,
+      categories: data.dailyActive.categories,
+      footerItems:[
+        { label:'今日',value:`${data.dailyActive.today}人` },
+        { label: '峰值', value: `${data.dailyActive.max}人` }
+      ]
+    },
+    {
+      title:'每日成交金额',
+      tagType: 'danger',
+      tagText: '月成交额',
+      type:'bar',
+      data: data.dailyGMV.data,
+      categories: data.dailyGMV.categories,
+      formatter: (value:number) => `¥${(value).toFixed(1)}元`,
+      footerItems:[
+        {label:'峰值',value: `${data.dailyGMV.max}元`},
+        { label: '环比', value: gmvGrowth, isPositive: !gmvGrowth.startsWith('-') }
+      ]
+    },
+  ]
+})
+
+// 计算统计卡片的环比数据
+const activeGrowthRate = computed(() => {
+  const data = getChartDataWithDefault().dailyActive
+  const today = data.data[data.data.length - 1] || 0
+  const yesterday = data.data[data.data.length - 2] || 0
+  return calculateGrowthRate(today, yesterday)
+})
+
+const dealGrowthRate = computed(() => {
+  const data = getChartDataWithDefault().dailyDealCount
+  const today = data.data[data.data.length - 1] || 0
+  const yesterday = data.data[data.data.length - 2] || 0
+  return calculateGrowthRate(today, yesterday)
+})
+
+// 默认统计数据
+const defaultStats = {
+  totalUsers: 5236,
+  female: 2856,
+  male: 2380,
+  totalTransactions: 1150,
+  todayActive: 1020,
+  todayDeals: 190
+}
+
+// 获取带默认值的统计数据
+const totalUsers = computed(() => {
+  return adminStore.outputValue || defaultStats.totalUsers
+})
+
+const femaleCount = computed(() => {
+  return adminStore.female || defaultStats.female
+})
+
+const maleCount = computed(() => {
+  return adminStore.male || defaultStats.male
+})
+
+const totalTransactions = computed(() => {
+  const data = getChartDataWithDefault()
+  return data.dailyDealCount.total || defaultStats.totalTransactions
+})
+
+const todayActive = computed(() => {
+  const data = getChartDataWithDefault()
+  return data.dailyActive.today || defaultStats.todayActive
+})
+
+const todayDeals = computed(() => {
+  const data = getChartDataWithDefault()
+  return data.dailyDealCount.today || defaultStats.todayDeals
+})
+
+// 图表实例需要在数据变化时重新渲染
+const reinitCharts = () => {
+  // 先销毁旧实例
+  chartInstances.value.forEach(chart => chart?.dispose())
+  chartInstances.value = []
+  
+  // 延迟初始化确保DOM更新
+  setTimeout(() => {
+    initCharts()
+  }, 100)
+}
+
+// 监听数据变化重新渲染图表
+watch(() => adminStore.chartData, () => {
+  reinitCharts()
+}, { deep: true })
 //收集图表ref
 const setChartRef = (el:any | null,index:number) => {
   if(el && el.tagName) {
@@ -196,11 +349,11 @@ onBeforeUnmount(() => {
         <el-row :gutter="16">
           <!--平台总用户-->
           <el-col :xs="24" :sm="12" :md="6" class="text-center mb-4">
-            <el-statistic title="Total users" :value="adminStore.outputValue"></el-statistic>
+            <el-statistic title="Total users" :value="totalUsers"></el-statistic>
           </el-col>
           <!--男女分布-->
           <el-col :xs="24" :sm="12" :md="6" class="text-center mb-4">
-            <el-statistic :value="adminStore.female">
+            <el-statistic :value="femaleCount">
               <template #title>
                 <div style="display: inline-flex; align-items: center">
                   Ratio of men to women
@@ -209,12 +362,12 @@ onBeforeUnmount(() => {
                   </el-icon>
                 </div>
               </template>
-              <template #suffix>/{{adminStore.male}}</template>
+              <template #suffix>/{{maleCount}}</template>
             </el-statistic>
           </el-col>
           <!--总贸易数-->
           <el-col :xs="24" :sm="12" :md="6" class="text-center mb-4">
-            <el-statistic title="Total Transactions" :value="adminStore.chartData?.dailyDealCount?.total"></el-statistic>
+            <el-statistic title="Total Transactions" :value="totalTransactions"></el-statistic>
           </el-col>
           <!--倒计时-->
           <el-col :xs="24" :sm="12" :md="6" class="text-center mb-4">
@@ -237,7 +390,7 @@ onBeforeUnmount(() => {
           <!--今日用户活跃度-->
           <el-col :xs="24" :sm="12" :md="6" class="text-center mb-4">
             <div class="statistic-card">
-              <el-statistic :value="adminStore.chartData?.dailyActive?.today">
+              <el-statistic :value="todayActive">
                 <template #title>
                   <div style="display: inline-flex;align-items: center">
                     Today active users
@@ -252,10 +405,11 @@ onBeforeUnmount(() => {
               <div class="statistic-footer">
                 <div class="footer-item">
                   <span>than yesterday</span>
-                  <span class="green">
-                    24%
+                  <span :class="activeGrowthRate.startsWith('-') ? 'red' : 'green'">
+                    {{ activeGrowthRate }}
                     <el-icon>
-                      <CaretTop/>
+                      <CaretTop v-if="!activeGrowthRate.startsWith('-')"/>
+                      <CaretBottom v-else/>
                     </el-icon>
                   </span>
                 </div>
@@ -296,7 +450,7 @@ onBeforeUnmount(() => {
           <!--今日成交单数-->
           <el-col :xs="24" :sm="12" :md="8" class="mb-4">
             <div class="statistic-card">
-              <el-statistic :value="adminStore.chartData.dailyDealCount?.today" title="New transactions today">
+              <el-statistic :value="todayDeals" title="New transactions today">
                 <template #title>
                   <div style="display: inline-flex; align-items: center">
                     New transactions today
@@ -306,12 +460,13 @@ onBeforeUnmount(() => {
               <div class="statistic-footer">
                 <div class="footer-item">
                   <span>than yesterday</span>
-                  <span class="green">
-              16%
-              <el-icon>
-                <CaretTop />
-              </el-icon>
-            </span>
+                  <span :class="dealGrowthRate.startsWith('-') ? 'red' : 'green'">
+                    {{ dealGrowthRate }}
+                    <el-icon>
+                      <CaretTop v-if="!dealGrowthRate.startsWith('-')"/>
+                      <CaretBottom v-else/>
+                    </el-icon>
+                  </span>
                 </div>
                 <div class="footer-item">
                   <el-icon :size="14">

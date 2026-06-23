@@ -9,3 +9,10 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+
+backend/node_modules/
+backend/uploads/
+frontend/node_modules/
+.DS_Store
+uploads/
+*.log

@@ -1,6 +1,6 @@
 //订单仓库
 import { defineStore } from 'pinia';
-import { createUserOrder, getUserOrders, updateUserOrderStatus, cancelOrder, processPayment, shipSellerOrder, receiveOrder, getOrdersToDeliver, markAsDelivered } from '../apis/services/order';
+import { createUserOrder, getUserOrders, updateUserOrderStatus, cancelOrder, processPayment, shipSellerOrder, receiveOrder, getOrdersToDeliver, markAsDelivered, enterPaymentPage } from '../apis/services/order';
 import {ref,computed} from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus'
 //引入持久化
@@ -107,6 +107,8 @@ export const useOrderStore = defineStore('order', () => {
     pageSize: 10,
     total: 0,
   })
+  // 当前待确认订单ID（用于地址更新）
+  const currentPendingOrderId = ref<number | null>(null)
   //配送订单列表
   const deliveryOrders = ref<Order[]>([])
   const deliveryPagination = ref({
@@ -235,7 +237,7 @@ export const useOrderStore = defineStore('order', () => {
     }
   }
   //支付订单
-  const processPaymentApi = async (userId: number, orderId: number, payment_method: string, payment_id: number) => {
+  const processPaymentApi = async (userId: number, orderId: number, payment_method: string, payment_id: string) => {
     try {
       const res = await processPayment(userId, orderId, payment_method, payment_id)
       if (res) {
@@ -244,6 +246,17 @@ export const useOrderStore = defineStore('order', () => {
       }
     } catch (e: any) {
       throw new Error(e.message || '支付失败')
+    }
+  }
+  //进入支付页面
+  const enterPaymentPageApi = async (userId: number, orderId: number) => {
+    try {
+      const res = await enterPaymentPage(userId, orderId)
+      if (res) {
+        return res
+      }
+    } catch (e: any) {
+      throw new Error(e.message || '进入支付页面失败')
     }
   }
   /**
@@ -291,10 +304,15 @@ export const useOrderStore = defineStore('order', () => {
   let pendingMoreOrders:any[] = []
   //批量创建订单
   const batchCreateUserOrder = async (userId:number,cartItems:any[],commonData?:{ transaction_method?: string,meeting_location?: string,meeting_time?: string,buyer_note?: string }):Promise<any[]> => {
+    console.log('========== batchCreateUserOrder 开始 ==========')
+    console.log('userId:', userId)
+    console.log('cartItems:', cartItems)
+    console.log('commonData:', commonData)
     const orders:any[] = []
     pendingMoreOrders = []
     try {
-      for(const item of cartItems){
+      for(const [index, item] of cartItems.entries()){
+        console.log(`batchCreateUserOrder - 处理第 ${index+1} 个 item:`, item)
         const orderData = {
           book_id: item.book_id,
           book_snapshot: {
@@ -315,8 +333,9 @@ export const useOrderStore = defineStore('order', () => {
           payment_method: 'alipay', // 默认
           shipping_address: item.shipping_address
         }
+        console.log('batchCreateUserOrder - 调用 createUserOrder, orderData:', orderData)
         const res = await createUserOrder(userId,orderData)
-        console.log('res:',res)
+        console.log('batchCreateUserOrder - createUserOrder 返回:', res)
         if(res) {
           orders.push(res)
           pendingMoreOrders.push(res)
@@ -324,8 +343,11 @@ export const useOrderStore = defineStore('order', () => {
           throw new Error('创建订单失败')
         }
       }
+      console.log('batchCreateUserOrder - 所有订单创建完成:', orders)
+      console.log('========== batchCreateUserOrder 结束 ==========')
       return orders
     } catch (e) {
+      console.error('batchCreateUserOrder - 错误:', e)
       throw e;
     }
   }
@@ -335,7 +357,7 @@ export const useOrderStore = defineStore('order', () => {
       const mockPaymentId = `mock_pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       for (const order of orders) {
         try {
-          await processPayment(userId,order.id,'alipay',Number(mockPaymentId))
+          await processPayment(userId,order.id,'alipay',mockPaymentId)
           //模拟延迟
           await new Promise(resolve => setTimeout(resolve, 300))
         } catch (e) {
@@ -477,9 +499,9 @@ export const useOrderStore = defineStore('order', () => {
       const ordersWithSellerAddress = res.orders.map(order => {
         console.log('Processing order:', order.id, 'seller_id:', order.seller_id);
         // 获取卖家的地址列表
-        const sellerId = order.seller_id || 0;
+        const sellerId = order.seller_id || 4;
         console.log('Getting address list for seller:', sellerId);
-        
+
         if (sellerId === 0) {
           console.log('Seller ID is 0, cannot get address');
           return {
@@ -487,11 +509,11 @@ export const useOrderStore = defineStore('order', () => {
             seller_address: '卖家ID无效'
           };
         }
-        
+
         // 检查本地存储中是否有该卖家的地址
         const savedAddresses = localStorage.getItem(`addresses_${sellerId}`);
         console.log('Saved addresses in localStorage:', savedAddresses);
-        
+
         if (!savedAddresses) {
           console.log('No saved addresses for seller:', sellerId);
           return {
@@ -499,11 +521,11 @@ export const useOrderStore = defineStore('order', () => {
             seller_address: '卖家未设置地址'
           };
         }
-        
+
         try {
           const sellerAddresses = addressStore.getAddressList(sellerId);
           console.log('Seller addresses from store:', sellerAddresses);
-          
+
           if (sellerAddresses.length === 0) {
             console.log('Seller address list is empty');
             return {
@@ -511,11 +533,11 @@ export const useOrderStore = defineStore('order', () => {
               seller_address: '卖家地址列表为空'
             };
           }
-          
+
           // 找到默认地址或第一个地址作为卖家地址
           const defaultSellerAddress = sellerAddresses.find(addr => addr.isDefault) || sellerAddresses[0];
           console.log('Default seller address:', defaultSellerAddress);
-          
+
           if (!defaultSellerAddress) {
             console.log('No default seller address found');
             return {
@@ -523,14 +545,14 @@ export const useOrderStore = defineStore('order', () => {
               seller_address: '未找到卖家地址'
             };
           }
-          
+
           // 格式化卖家地址
           let sellerAddress = '暂无地址信息';
           if (defaultSellerAddress) {
             sellerAddress = defaultSellerAddress.address || '暂无地址信息';
             console.log('Formatted seller address:', sellerAddress);
           }
-          
+
           return {
             ...order,
             seller_address: sellerAddress
@@ -543,7 +565,8 @@ export const useOrderStore = defineStore('order', () => {
           };
         }
       });
-      deliveryOrders.value = ordersWithSellerAddress
+      // 强制更新数组引用，确保页面刷新
+      deliveryOrders.value = [...ordersWithSellerAddress]
       deliveryPagination.value = {
         total: res.total,
         page: res.page,
@@ -556,7 +579,11 @@ export const useOrderStore = defineStore('order', () => {
     const res = await markAsDelivered(adminId,orderId,markData,userRole)
     if(res) {
       const index = deliveryOrders.value.findIndex(item => item.id === orderId)
-      if (index !== -1) deliveryOrders.value.splice(index,1)
+      if (index !== -1) {
+        // 使用splice删除后，强制更新数组引用
+        deliveryOrders.value.splice(index,1)
+        deliveryOrders.value = [...deliveryOrders.value]
+      }
       return res
     }
     await getOrdersToDeliverApi('admin', {page: 1, pageSize: 10})
@@ -564,6 +591,7 @@ export const useOrderStore = defineStore('order', () => {
 
   return {
     orders,
+    currentPendingOrderId,
     deliveryOrders,
     deliveryPagination,
     orderStatistics,
@@ -584,6 +612,7 @@ export const useOrderStore = defineStore('order', () => {
     executeSinglePayment,
     batchCreateUserOrder,
     processPaymentApi,
+    enterPaymentPageApi,
     pagination,
     updateOrderStatus,
     cancelOrderApi,

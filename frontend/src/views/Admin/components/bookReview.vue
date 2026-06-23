@@ -41,6 +41,20 @@ const previewImage = (imageUrl) => {
   previewDialog.value = true;
 };
 
+// 解析图片字段（兼容字符串和数组格式）
+const parseImages = (images) => {
+  if (!images) return [];
+  if (Array.isArray(images)) return images;
+  if (typeof images === 'string') {
+    try {
+      return JSON.parse(images);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 // 加载待审核图书列表
 const loadPendingBooks = async () => {
   loading.value = true;
@@ -89,7 +103,13 @@ const submitReview = async () => {
       result: reviewForm.value.result,
       adminId: authStore.userId || 1
     });
-    ElMessage.success('审核成功');
+    if (reviewForm.value.status === 'approved') {
+      ElMessageBox.alert('该图书已上架', '审核通过', {
+        confirmButtonText: '确定',
+      });
+    } else {
+      ElMessage.success('审核成功');
+    }
     reviewDialog.value = false;
     loadPendingBooks();
   } catch (error) {
@@ -149,7 +169,7 @@ onMounted(() => {
             ¥{{ scope.row.price }}
           </template>
         </el-table-column>
-        <el-table-column prop="seller_id" label="卖家ID" width="100" />
+        <el-table-column prop="seller_username" label="卖家用户名" width="150" />
         <el-table-column prop="created_at" label="提交时间" width="180">
           <template #default="scope">
             {{ formatDate(scope.row.created_at) }}
@@ -197,40 +217,30 @@ onMounted(() => {
           </div>
         </el-form-item>
         <el-form-item label="图书图片">
-          <div v-if="currentBook && currentBook.cover_image" class="book-images">
-            <!-- 处理数组情况 -->
+          <div v-if="currentBook" class="book-images-container">
+            <!-- 展示封面图 -->
             <div 
-              v-if="Array.isArray(currentBook.cover_image) && currentBook.cover_image.length > 0" 
-              class="book-images"
+              v-if="currentBook.cover_image && typeof currentBook.cover_image === 'string'" 
+              class="book-image-item"
+              @click="previewImage(currentBook.cover_image)"
             >
-              <div 
-                v-for="(image, index) in currentBook.cover_image" 
-                :key="index"
-                class="book-image-item"
-                @click="previewImage(image)"
-              >
-                <img :src="image" :alt="`图书图片 ${index + 1}`" class="book-image" />
-              </div>
+              <img :src="currentBook.cover_image" alt="封面图" class="book-image" />
+              <span class="image-label">封面</span>
             </div>
-            <!-- 处理字符串情况 -->
+            <!-- 展示详情图片 -->
             <div 
-              v-else-if="typeof currentBook.cover_image === 'string' && currentBook.cover_image.trim()" 
-              class="book-images"
+              v-for="(image, index) in parseImages(currentBook.images)" 
+              :key="index"
+              class="book-image-item"
+              @click="previewImage(image)"
             >
-              <div 
-                class="book-image-item"
-                @click="previewImage(currentBook.cover_image)"
-              >
-                <img :src="currentBook.cover_image" alt="图书封面" class="book-image" />
-              </div>
+              <img :src="image" :alt="`图片 ${index + 1}`" class="book-image" />
+              <span class="image-label">图{{ index + 1 }}</span>
             </div>
             <!-- 无图片情况 -->
-            <div v-else class="no-images">
+            <div v-if="!currentBook.cover_image && !currentBook.images" class="no-images">
               暂无图片
             </div>
-          </div>
-          <div v-else class="no-images">
-            暂无图片
           </div>
         </el-form-item>
         <el-form-item label="审核结果" required>
@@ -251,7 +261,7 @@ onMounted(() => {
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="reviewDialog = false">取消</el-button>
-          <el-button type="primary" @click="submitReview">提交审核</el-button>
+          <el-button type="primary" @click="submitReview">确认</el-button>
         </span>
       </template>
     </el-dialog>
@@ -428,7 +438,7 @@ $transition: all 0.3s ease;
 }
 
 // 图片展示样式
-.book-images {
+.book-images-container {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -448,11 +458,24 @@ $transition: all 0.3s ease;
   overflow: hidden;
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  position: relative;
   
   &:hover {
     border-color: $primary-color;
     transform: scale(1.05);
     box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+  }
+  
+  .image-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 12px;
+    padding: 4px 8px;
+    text-align: center;
   }
 }
 

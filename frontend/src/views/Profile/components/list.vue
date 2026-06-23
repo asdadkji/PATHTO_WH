@@ -33,10 +33,11 @@ const matched = computed(() => route.matched.filter(r => r.meta && r.meta.title)
                 <span>我是买家</span>
               </template>
               <el-menu-item-group title="常用入口">
-                <el-menu-item index="/cart">我的购物车</el-menu-item>
-                <el-menu-item index="/profile/orders">我的订单</el-menu-item>
-                <el-menu-item index="/profile/favorite">我的收藏</el-menu-item>
-                <el-menu-item index="/profile/address">我的收货地址</el-menu-item>
+                <el-menu-item index="/cart">购物车管理</el-menu-item>
+                <el-menu-item index="/profile/orders">订单管理</el-menu-item>
+                <el-menu-item index="/profile/favorite">收藏管理</el-menu-item>
+                <el-menu-item index="/profile/address">地址管理</el-menu-item>
+                <el-menu-item index="/profile/coupon">优惠券管理</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>
             <el-sub-menu index="2">
@@ -45,8 +46,7 @@ const matched = computed(() => route.matched.filter(r => r.meta && r.meta.title)
                 <span>账号安全</span>
               </template>
               <el-menu-item-group title="账户管理">
-                <el-menu-item index="/profile/account">个人资料</el-menu-item>
-                <el-menu-item index="/profile/coupon">我的优惠券</el-menu-item>
+                <el-menu-item index="/profile/account">个人信息管理</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>
           </el-menu>

@@ -13,8 +13,10 @@ const whiteListPatterns = [
   /^\/auth\/login$/,
   /^\/auth\/register$/,
   /^\/auth\/forget$/,
-  /^\/product\/\d+$/,  // 匹配 /product/123 这样的路径
-  /^\/filter$/
+  /^\/product\/\d+$/,
+  /^\/filter$/,
+  /^\/filter\/category$/,
+  /^\/filter\/search$/
 ]
 // 请求拦截器
 service.interceptors.request.use(
@@ -48,10 +50,12 @@ service.interceptors.response.use(
     if (code === 0) {
       return data
     } else {
+      console.log('响应拦截器 - 错误响应:', response.status, response.data);
       return Promise.reject(response.data)
     }
   },
   (error) => {
+    console.log('响应拦截器 - 错误:', error.response?.status, error.message);
     return Promise.reject(error)
   }
 )

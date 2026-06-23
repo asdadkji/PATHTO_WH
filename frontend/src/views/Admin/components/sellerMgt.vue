@@ -56,7 +56,16 @@ const handleUnfreeze = async (id:number) => {
   <div class="sellerMgt__container">
     <el-table :data="filterTableData" style="width: 100%;" height="715" :row-class-name="tableRowClassName">
       <el-table-column prop="shop_name" label="商家名" width="180" />
-      <el-table-column prop="contact_phone" label="手机号" width="180" />
+      <el-table-column label="手机号" width="180">
+          <template #default="scope">
+            <el-tooltip :content="scope.row.contact_phone || '无'" placement="top">
+              <span v-if="scope.row.contact_phone">
+                {{ scope.row.contact_phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') }}
+              </span>
+              <span v-else>无</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
       <el-table-column prop="reason" label="封禁原因" width="380">
         <template #default="scope">
           <el-input placeholder="请写入你封禁该商家的原因" v-model="scope.row.reason" :disabled="scope.row.status === 2"></el-input>

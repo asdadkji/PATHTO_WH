@@ -55,16 +55,17 @@ const authStore = useAuthStore()
             <el-sub-menu index="3">
               <template #title>
                 <el-icon><document /></el-icon>
-                <span>图书审查</span>
+                <span>图书管理</span>
               </template>
-              <el-menu-item-group title="审查">
-                <el-menu-item index="/admin/bookReview">图书审查</el-menu-item>
+              <el-menu-item-group title="管理">
+                <el-menu-item index="/admin/bookMgt">图书管理</el-menu-item>
+                <el-menu-item index="/admin/bookReview">图书审核</el-menu-item>
               </el-menu-item-group>
             </el-sub-menu>
             <el-sub-menu index="5">
               <template #title>
                 <el-icon><icon-menu /></el-icon>
-                <span>物流运输</span>
+                <span>运输管理</span>
               </template>
               <el-menu-item-group title="图书运输">
                 <el-menu-item index="/admin/transport">运输表</el-menu-item>

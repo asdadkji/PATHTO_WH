@@ -56,22 +56,22 @@ const getOfflineTradeKey = (bookId: number) => {
 const checkOrderStatus = async () => {
   const bookId = bookStore.bookData?.id
   if (!bookId || !authStore.userId) return
-  
+
   try {
     // 获取用户的订单列表
     await orderStore.getUserOrdersList(authStore.userId, 'buyer', 1, 10, 'all')
-    
+
     // 查找与当前商品相关的线下交易订单
-    const relatedOrders = orderStore.orders.filter(order => 
-      order.book_id === bookId && 
+    const relatedOrders = orderStore.orders.filter(order =>
+      order.book_id === bookId &&
       order.transaction_method === 'face_to_face'
     )
-    
+
     // 检查是否有已取消的订单
-    const hasCancelledOrder = relatedOrders.some(order => 
+    const hasCancelledOrder = relatedOrders.some(order =>
       order.status === 'cancelled'
     )
-    
+
     // 如果有已取消的订单，重置线下交易状态
     if (hasCancelledOrder) {
       const key = getOfflineTradeKey(bookId)
@@ -207,7 +207,7 @@ const confirmOfflineTrade = async () => {
 
     // 调用后端API创建订单
     const order = await orderStore.createOrder(authStore.userId, orderData)
-    
+
     if (order) {
       // 设置线下交易已选择，禁用线上交易按钮
       offlineTradeSelected.value = true
@@ -250,7 +250,7 @@ const switchImage = ()=>{
 //图书数据\商家优惠券展示初始化
 onMounted(async ()=>{
   await bookStore.getBookDetailById(Number(route.params.id))
-  await couponStore.getMerchantCoupons(1) /*bookStore.bookData.merchant_id*/
+  await couponStore.getMerchantCoupons(bookStore.bookData?.merchant_id || 1)
   // 检查订单状态，重置已取消订单的线下交易状态
   await checkOrderStatus()
 })
@@ -270,7 +270,7 @@ const addToCart = ()=>{
     book_condition:bookStore.bookData.book_condition,
     merchant_name:bookStore.bookData.merchantName || '',
     merchantId:bookStore.bookData.merchant_id,
-    seller_id: bookStore.bookData.seller_id
+    seller_id: bookStore.bookData.seller_id ?? 4
   }
   cartStore.addToGoods(data)
   alert('添加成功')
@@ -403,16 +403,16 @@ const conditionText = computed(() => {
       <!--购买按钮-->
       <div class="product-info__btn">
         <div>
-          <el-button 
-            style="padding: 16px 40px" 
+          <el-button
+            style="padding: 16px 40px"
             @click="buyNow"
             :disabled="offlineTradeSelected"
             :title="offlineTradeSelected ? '已选择线下交易，无法使用线上交易' : ''"
           >
             {{ offlineTradeSelected ? '已选择线下交易' : '立刻购买' }}
           </el-button>
-          <el-button 
-            style="padding: 16px 40px" 
+          <el-button
+            style="padding: 16px 40px"
             @click="addToCart"
             :disabled="offlineTradeSelected"
             :title="offlineTradeSelected ? '已选择线下交易，无法使用线上交易' : ''"
@@ -441,7 +441,13 @@ const conditionText = computed(() => {
       </div>
       <div class="info-item">
         <span class="label">卖家联系电话：</span>
-        <span>{{ bookStore.bookData?.seller_phone || authStore.user?.phone || '请联系卖家获取' }}</span>
+        <span v-if="bookStore.bookData?.seller_phone">
+          {{ bookStore.bookData.seller_phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') }}
+        </span>
+        <span v-else-if="authStore.user?.phone">
+          {{ authStore.user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') }}
+        </span>
+        <span v-else>请联系卖家获取</span>
       </div>
       <div class="info-item">
         <span class="label">交易安全提示：</span>

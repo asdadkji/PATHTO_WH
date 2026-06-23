@@ -55,7 +55,7 @@ const handleFilter = () => {
     title:formInline.title,
     author:formInline.author,
     category_id:Number(selectCategory.value+1),
-    status:selectStatus.value
+    status:selectStatus.value || undefined
   }
   console.log(filterData)
   currentPage.value=1
@@ -67,11 +67,17 @@ const getCategoryLabel = (categoryId:number) => {
   return category ? category.label : '未知分类'
 }
 //下架
-const handleDelete = (bookId:number,merchantId:number) => {
-  if(selectStatus.value === 'available') {
-    bookStore.deleteBookById(merchantId,bookId)
-  } else {
-    alert('该图书已下架')
+const handleDelete = async (bookId:number,merchantId:number) => {
+  try {
+    const res = await bookStore.deleteBookById(merchantId,bookId)
+    if (res && res.code === 1) {
+      alert(res.message)
+    } else {
+      alert('下架成功')
+    }
+  } catch (e) {
+    console.error('下架失败', e)
+    alert('下架失败')
   }
 }
 </script>
@@ -119,7 +125,7 @@ const handleDelete = (bookId:number,merchantId:number) => {
       </el-table-column>
       <el-table-column label="操作">
         <template #default="{row}">
-          <el-button type="danger" link @click="handleDelete(row.id,1)">下架</el-button>
+          <el-button v-if="row.status === 'available'" type="danger" link @click="handleDelete(row.id,1)">下架</el-button>
         </template>
       </el-table-column>
     </el-table>

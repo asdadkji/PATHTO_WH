@@ -43,6 +43,8 @@ export const useBookStore = defineStore('book', () => {
   const deleteBookById = async (merchantId:number,bookId: number) => {
     try {
       const res = await deleteBook(merchantId, bookId)
+      // 重新获取图书列表，更新状态
+      await getMerchantBookList(merchantId)
       return res
     } catch (e:any) {
       console.log(e)

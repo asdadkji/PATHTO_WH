@@ -93,7 +93,7 @@ export const getAdminListApi = (adminId:number):Promise<adminList[]> => {
 }
 //赋予管理权限
 export const setAdminApi = (params: {username:string,phone:string}, adminId:number) => {
-  return service.patch('/admin/setAdmin', {params}, {params:{adminId}})
+  return service.patch('/admin/setAdmin', params, {params:{adminId}})
 }
 //取消管理权限
 export const cancelAdminApi = (adminId:number,userId:number) => {
@@ -104,12 +104,12 @@ export const getShopListApi = (adminId:number,page:number,pageSize:number):Promi
   return service.get('/admin/sellerList',{params:{adminId,page,pageSize}})
 }
 //冻结商家权限
-export const freezeShopApi = (reason: string,adminId:number) => {
-  return service.patch('/admin/freezeSeller', {reason},{params:{adminId}})
+export const freezeShopApi = (sellerId: number, reason: string) => {
+  return service.patch('/admin/freezeSeller', {reason}, {params:{sellerId}})
 }
 //解冻商家权限
-export const unfreezeShopApi = (adminId:number) => {
-  return service.patch('/admin/unfreezeSeller',{params:{adminId}})
+export const unfreezeShopApi = (sellerId:number) => {
+  return service.patch('/admin/unfreezeSeller', undefined, {params:{sellerId}})
 }
 //获取已送达的订单
 export const getOrdersToDeliverApi = ():Promise<Order[]> => {
@@ -138,5 +138,5 @@ export const banBuyerApi = (adminId:number,buyerId:number,reason:string) => {
 
 //解封买家账号
 export const unbanBuyerApi = (adminId:number,buyerId:number) => {
-  return service.patch('/admin/unbanBuyer',{params:{adminId,buyerId}})
+  return service.patch('/admin/unbanBuyer', undefined, {params:{adminId,buyerId}})
 }

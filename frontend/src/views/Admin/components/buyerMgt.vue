@@ -42,7 +42,16 @@ const closeBuyerDetail = () => {
     <div class="buyerMgt__table">
       <el-table :data="adminStore.buyerList" style="width: 100%" height="715">
         <el-table-column prop="username" label="用户名" width="180" />
-        <el-table-column prop="phone" label="手机号" width="180" />
+        <el-table-column label="手机号" width="180">
+          <template #default="scope">
+            <el-tooltip :content="scope.row.phone || '无'" placement="top">
+              <span v-if="scope.row.phone">
+                {{ scope.row.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') }}
+              </span>
+              <span v-else>无</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
         <el-table-column prop="email" label="邮箱" width="180" />
         <el-table-column prop="created_at" label="注册时间" width="180">
           <template #default="scope">

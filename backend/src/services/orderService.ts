@@ -82,15 +82,21 @@ const toEnum = (s:string):OrderStatus => {
 export const orderService = {
     //创建订单
     async createOrder(buyerId:number,request:CreateOrderRequest):Promise<IOrder>{
+        console.log('========== orderService.createOrder 开始 ==========')
+        console.log('buyerId:', buyerId)
+        console.log('request:', request)
         //计算金额
         const totalPrice = request.unit_price * request.quantity
         const finalPrice = totalPrice + (request.delivery_fee || 0)
+        console.log('totalPrice:', totalPrice)
+        console.log('finalPrice:', finalPrice)
         //生成订单号
         const orderNumber = generateOrderNumber({
             businessType:"BOOK",
             transactionMethod:'ONLINE',
             userId:buyerId,
         });
+        console.log('orderNumber:', orderNumber)
         const orderData: Omit<IOrder, 'id'> = {
             order_number: orderNumber,
             book_id: request.book_id,
@@ -104,7 +110,6 @@ export const orderService = {
             final_price: finalPrice,
             status: OrderStatus.PENDING,
             payment_method: request.payment_method || PaymentMethod.CASH,
-            payment_status: PaymentStatus.PENDING,
             transaction_method: request.transaction_method,
             meeting_location: request.meeting_location,
             meeting_time: request.meeting_time ? new Date(request.meeting_time) : undefined,
@@ -113,7 +118,49 @@ export const orderService = {
             updated_at: new Date(),
             shipping_address: request.shipping_address,
         }
-        return await OrderModel.createOrder(orderData)
+        console.log('orderData:', orderData)
+        const result = await OrderModel.createOrder(orderData)
+        console.log('OrderModel.createOrder 返回:', result)
+        console.log('========== orderService.createOrder 结束 ==========')
+        return result
+    },
+    //更新订单收货地址
+    async updateOrderAddress(orderId: number, shippingAddress: any): Promise<IOrder> {
+        console.log('========== orderService.updateOrderAddress 开始 ==========')
+        console.log('orderId:', orderId)
+        console.log('shippingAddress:', shippingAddress)
+        
+        const order = await OrderModel.findOrderById(orderId)
+        if (!order) {
+            throw new Error('订单不存在')
+        }
+        
+        console.log('订单当前状态:', order.status)
+        console.log('订单 payment_status:', order.payment_status)
+        
+        // 允许 pending 或 paid + pending 状态的订单更新地址
+        const canUpdate = (
+            order.status === OrderStatus.PENDING || 
+            (order.status === OrderStatus.PAID && order.payment_status === 'pending')
+        )
+        
+        if (!canUpdate) {
+            throw new Error('只能更新待确认或待付款状态的订单地址')
+        }
+        
+        const success = await OrderModel.updateOrder(orderId, {
+            shipping_address: shippingAddress,
+            updated_at: new Date()
+        })
+        
+        if (!success) {
+            throw new Error('更新订单地址失败')
+        }
+        
+        const updatedOrder = await OrderModel.findOrderById(orderId)
+        console.log('updatedOrder:', updatedOrder)
+        console.log('========== orderService.updateOrderAddress 结束 ==========')
+        return updatedOrder!
     },
     //更新订单状态
     async updateOrderStatus(orderId:number, newStatus:OrderStatus,actor:'buyer' | 'seller' | 'admin', actorId:number,request?:UpdateOrderStatusRequest):Promise<IOrder>{
@@ -208,18 +255,52 @@ export const orderService = {
         return await OrderModel.getUserOrders(userId,userType,options)
     },
     //取消订单
-    async cancelOrder(orderId:number,actor:'buyer'|'seller'|'admin',actorId:number):Promise<IOrder>{  
+    async cancelOrder(orderId:number,actor:'buyer'|'seller'|'admin',actorId:number):Promise<IOrder>{
         const order = await orderService.updateOrderStatus(orderId,OrderStatus.CANCELLED, actor,actorId) /*[orderId],OrderStatus.CANCELLED,{cancel_reason:reason,cancelled_at:new Date()}*/
         if(!order) throw new Error('取消订单失败')
         return order
+    },
+    //进入支付页面：pending -> paid(pending)
+    async enterPaymentPage(orderId:number, buyerId:number):Promise<IOrder> {
+        const order = await OrderModel.findOrderById(orderId)
+        if(!order) throw new Error('订单不存在')
+        if(order.status !== OrderStatus.PENDING) throw new Error('订单状态不正确')
+        if(order.buyer_id !== buyerId) throw new Error('订单不属于该用户')
+        // 直接更新订单状态：status=paid, payment_status=pending
+        const success = await OrderModel.updateOrder(orderId, {
+            status: OrderStatus.PAID,
+            payment_status: PaymentStatus.PENDING,
+            updated_at: new Date()
+        })
+        if(success) {
+            const result = await OrderModel.findOrderById(orderId)
+            if(!result) throw new Error('订单不存在')
+            return result
+        }
+        throw new Error('进入支付页面失败')
     },
     //支付
     async payOrder(orderId:number,buyerId:number,paymentMethod:PaymentMethod,paymentId:string):Promise<IOrder> {
         const order = await OrderModel.findOrderById(orderId)
         if(!order) throw new Error('订单不存在')
-        if(order.status !== OrderStatus.PENDING) throw new Error('订单状态不正确')
+        if(order.status !== OrderStatus.PAID || order.payment_status !== PaymentStatus.PENDING) {
+            throw new Error('订单状态不正确')
+        }
         if(order.buyer_id !== buyerId) throw new Error('订单不属于该用户')
-        return await orderService.updateOrderStatus(orderId,OrderStatus.PAID,'buyer',buyerId,{status:OrderStatus.PAID,data:{payment_method:paymentMethod,payment_id:paymentId}})
+        
+        // 直接更新订单状态为 paid + paid，不走 updateOrderStatus 因为状态没变
+        const success = await OrderModel.updateOrder(orderId, {
+            payment_status: PaymentStatus.PAID,
+            payment_id: paymentId,
+            paid_at: new Date(),
+            updated_at: new Date()
+        })
+        
+        if(!success) throw new Error('支付失败')
+        
+        const updatedOrder = await OrderModel.findOrderById(orderId)
+        if(!updatedOrder) throw new Error('订单不存在')
+        return updatedOrder
     },
     //卖家发货
     async shipOrder(orderId:number, sellerId:number, trackingCompany:string, trackingNumber:string):Promise<IOrder> {
@@ -242,6 +323,7 @@ export const orderService = {
         end_date?:Date
         buyer_name?:string
         buyer_phone?:string
+        status?:string
     }={},options:{page?:number,pageSize?:number}={}):Promise<{orders:IOrder[];total:number}> {
         return await OrderModel.findOrdersForDelivery(filters,options)
     },

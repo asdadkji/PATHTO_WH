@@ -50,7 +50,14 @@ export const AdminModel = {
     async isAdmin(id: number): Promise<boolean> {
         const sql = 'SELECT * FROM users WHERE id = ? LIMIT 1';
         const [rows] = await pool.query<UserAuth[]>(sql, [id]);
-        return rows.length > 0 && (rows[0].role === 'admin' || rows[0].role === 'maxAdmin');
+        console.log('isAdmin检查 - id:', id, '查询结果:', rows);
+        if (rows.length === 0) {
+            console.log('isAdmin检查 - 用户不存在');
+            return false;
+        }
+        const isAdmin = rows[0].role === 'admin' || rows[0].role === 'maxAdmin';
+        console.log('isAdmin检查 - role:', rows[0].role, '是否管理员:', isAdmin);
+        return isAdmin;
     },
     //获取用户总数
     async getUserCount(): Promise<number> {

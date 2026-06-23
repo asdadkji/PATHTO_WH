@@ -73,11 +73,12 @@ export const setAdmin = async (req: Request, res: Response) => {
     try {
         const adminId = Number(req.query.adminId);
         const {username,phone} = req.body;
+        console.log('赋予权限接收到的数据:', {adminId, username, phone, body: req.body});
         const isAdmin = await adminService.isAdminS(adminId);
         if(!isAdmin) {
             return res.status(401).json({code:1,message: "没有权限"})
         }
-        const result = await adminService.setAdminS(username,phone);
+        const result = await adminService.setAdminS(phone,username);
         if(result) {
             res.status(200).json({code:0,message: "成功赋予管理权限",data: result})
         }
@@ -127,23 +128,47 @@ export const getSellerList = async (req: Request, res: Response) => {
 export const freezeSeller = async (req: Request, res: Response) => {
     const sellerId = Number(req.query.sellerId);
     const reason = req.body.reason;
+    
+    // 参数验证
+    if (isNaN(sellerId) || sellerId <= 0) {
+        return res.status(400).json({code: 1, message: '无效的商家ID'});
+    }
+    
+    if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({code: 1, message: '请输入冻结理由'});
+    }
+    
     try {
-        const result = await adminService.freezeShopS(sellerId,reason);
-        if(result) res.status(200).json({code:0,message: "成功冻结商家权限",data: result})
+        const result = await adminService.freezeShopS(sellerId, reason);
+        if(result) {
+            res.status(200).json({code: 0, message: "成功冻结商家权限", data: result});
+        } else {
+            res.status(400).json({code: 1, message: "冻结商家权限失败"});
+        }
     } catch (e) {
-        console.log('冻结商家权限失败',e)
+        console.log('冻结商家权限失败', e);
+        res.status(500).json({code: 1, message: '冻结商家权限失败'});
     }
 }
 //解冻商家权限
 export const unfreezeSeller = async (req: Request, res: Response) => {
     const sellerId = Number(req.query.sellerId);
+    
+    // 参数验证
+    if (isNaN(sellerId) || sellerId <= 0) {
+        return res.status(400).json({code: 1, message: '无效的商家ID'});
+    }
+    
     try {
         const result = await adminService.unfreezeShopS(sellerId);
         if(result) {
-            res.status(200).json({code:0,message: "成功解冻商家权限",data: result})
+            res.status(200).json({code: 0, message: "成功解冻商家权限", data: result});
+        } else {
+            res.status(400).json({code: 1, message: "解冻商家权限失败"});
         }
     } catch (e) {
-        console.log('解冻商家权限失败',e)
+        console.log('解冻商家权限失败', e);
+        res.status(500).json({code: 1, message: '解冻商家权限失败'});
     }
 }
 //获取已送达的图书列表
@@ -237,8 +262,9 @@ export const banBuyer = async (req: Request, res: Response) => {
 //解封买家账号
 export const unbanBuyer = async (req: Request, res: Response) => {
     try {
-        const adminId = Number(req.query.adminId);
-        const buyerId = Number(req.query.buyerId);
+        const adminId = isNaN(Number(req.query.adminId)) ? 1 : Number(req.query.adminId);
+        const buyerId = isNaN(Number(req.query.buyerId)) ? 0 : Number(req.query.buyerId);
+        console.log('解封买家 - adminId:', adminId, 'buyerId:', buyerId);
         const isAdmin = await adminService.isAdminS(adminId);
         if(!isAdmin) {
             return res.status(401).json({code:1,message: "没有权限"})

@@ -103,7 +103,7 @@ const selectCondition = ref('')
 import {useBookStore} from "@/stores/book.ts";
 import {useAuthStore} from "@/stores/auth.ts";
 import {getMerchantId} from "@/apis/services/auth.ts";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 const bookStore = useBookStore()
 const authStore = useAuthStore()
 //提交表单
@@ -113,14 +113,14 @@ const submitForm = async () => {
       ElMessage.error('用户未登录');
       return;
     }
-    
+
     if (!authStore.isSeller) {
       ElMessage.error('您还不是商家，请先完成商家认证');
       return;
     }
-    
+
     const merchantId = await getMerchantId(authStore.userId);
-    
+
     const formData = {
       title:ruleForm.title,
       highlights:ruleForm.recommend,
@@ -132,11 +132,15 @@ const submitForm = async () => {
       book_condition:selectCondition.value,
       description:ruleForm.description,
       price:ruleForm.price,
-      cover_image:ruleForm.img.map(item=>item.url),
+      cover_image:ruleForm.img.length > 0 ? ruleForm.img[0].url : '',
+      images:ruleForm.img.map(item=>item.url),
       seller_id:authStore.userId,
       merchant_id:merchantId,
     }
-    bookStore.listBook(formData)
+    await bookStore.listBook(formData)
+    ElMessageBox.alert('上架请求已提交', '提示', {
+      confirmButtonText: '确定',
+    })
     resetForm()
   } catch (error) {
     ElMessage.error('获取商家信息失败，请先完成商家认证');
@@ -146,6 +150,25 @@ const submitForm = async () => {
 const formRef = ref<FormInstance>()
 const resetForm = () => {
   formRef.value?.resetFields()
+}
+
+// 处理图片上传成功
+const handleImageSuccess = (response: any, uploadFile: any) => {
+  // 使用服务器返回的真实URL
+  console.log('图片上传成功:', response);
+  console.log('上传的文件:', uploadFile);
+  if (response && response.data && response.data.url) {
+    uploadFile.url = response.data.url;
+    console.log('设置的图片URL:', uploadFile.url);
+  } else {
+    console.error('响应格式不正确:', response);
+  }
+}
+
+// 处理图片上传失败
+const handleImageError = (error: any) => {
+  ElMessage.error('图片上传失败，请重试')
+  console.error('图片上传失败:', error)
 }
 </script>
 
@@ -178,7 +201,7 @@ const resetForm = () => {
           v-model="ruleForm.publishDate"
         ></el-date-picker>
       </el-form-item>
-      <el-form-item label="定价" prop="originalPrice" style="margin-bottom: 24px">
+      <el-form-item label="原价" prop="originalPrice" style="margin-bottom: 24px">
         <el-input v-model="ruleForm.originalPrice"></el-input>
       </el-form-item>
       <el-form-item label="品相" prop="condition" style="margin-bottom: 24px">
@@ -195,9 +218,11 @@ const resetForm = () => {
       <el-form-item label="书籍图片" prop="img" style="margin-bottom: 24px">
         <el-upload
           v-model:file-list="ruleForm.img"
-          action="https://run.mocky.io/v3/9d059bf9-4660-45f2-925d-ce80ad6c4d15"
+          action="http://localhost:3000/api/upload/image"
           list-type="picture-card"
           class="upload-demo"
+          :on-success="handleImageSuccess"
+          :on-error="handleImageError"
         >
           <el-button>上传图书相关图片</el-button>
           <template #tip>

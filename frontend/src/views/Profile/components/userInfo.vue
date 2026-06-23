@@ -8,15 +8,18 @@ import type { FormItemRule } from 'element-plus'
 import type {User} from '@/types/api/user.ts'
 //上传图片
 const imageUrl = ref('')
-const handleAvatarSuccess: UploadProps['onSuccess'] = (response, uploadFile) => {
+const handleAvatarSuccess: UploadProps['onSuccess'] = async (response, uploadFile) => {
+  // 显示本地预览
   imageUrl.value = URL.createObjectURL(uploadFile.raw!)
+  // 同时更新到表单数据
+  formData.value.avatar_url = imageUrl.value
 }
 const beforeAvatarUpload: UploadProps['beforeUpload'] = (rawFile) => {
-  if (rawFile.type !== 'image/jpeg') {
-    ElMessage.error('Avatar picture must be JPG format!')
+  if (rawFile.type !== 'image/jpeg' && rawFile.type !== 'image/png' && rawFile.type !== 'image/gif') {
+    ElMessage.error('头像图片格式必须是 JPG、PNG 或 GIF！')
     return false
   } else if (rawFile.size / 1024 / 1024 > 2) {
-    ElMessage.error('Avatar picture size can not exceed 2MB!')
+    ElMessage.error('头像图片大小不能超过 2MB！')
     return false
   }
   return true
@@ -28,6 +31,10 @@ const rules = reactive({
   username: [
     { required: true, message: '请输入昵称', trigger: 'blur' },
     { min: 1, max: 10, message: '长度在 1 到 10 个字符', trigger: 'blur' }
+  ],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
   qq: [
     { required: true, message: '请输入QQ号', trigger: 'blur' },
@@ -115,7 +122,7 @@ const handleReset = () => {
         <el-button @click="isShowName = !isShowName" style="padding: 4px">取消</el-button>
       </div>
     </el-form-item>
-    <el-form-item label="我的头像：">
+    <!-- <el-form-item label="我的头像：">
       <el-upload
         class="avatar-uploader"
         action="https://run.mocky.io/v3/9d059bf9-4660-45f2-925d-ce80ad6c4d15"
@@ -126,7 +133,7 @@ const handleReset = () => {
         <img v-if="imageUrl" :src="imageUrl" class="avatar" />
         <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
       </el-upload>
-    </el-form-item>
+    </el-form-item> -->
     <el-form-item label="性别：" style="margin-bottom: 16px" prop="sex">
       <el-radio-group v-model="formData.gender">
         <el-radio label="男" style="margin-right: 4px" value="male">男</el-radio>
@@ -134,8 +141,11 @@ const handleReset = () => {
         <el-radio label="保密">保密</el-radio>
       </el-radio-group>
     </el-form-item>
+    <el-form-item label="手机号：" style="margin-bottom: 16px" prop="phone">
+      <el-input v-model="formData.phone" placeholder="请输入手机号" show-password />
+    </el-form-item>
     <el-form-item label="QQ号码：" style="margin-bottom: 16px" prop="qq">
-      <el-input v-model="formData.qq"/>
+      <el-input v-model="formData.qq" placeholder="请输入QQ号" show-password />
     </el-form-item>
     <el-form-item label="学院：" style="margin-bottom: 16px" prop="address">
       <el-input v-model="formData.college"/>

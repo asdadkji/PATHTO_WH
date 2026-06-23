@@ -2,7 +2,23 @@
 import service from '@/apis/http.ts'
 //创建订单
 export const createUserOrder = (userId:number,params:any):Promise<any> => {
-  return service.post(`/order/create/${userId}`,params)
+  console.log('========== createUserOrder API 调用 ==========')
+  console.log('URL:', `/order/create/${userId}`)
+  console.log('params:', params)
+  const promise = service.post(`/order/create/${userId}`,params)
+  promise.then(res => {
+    console.log('createUserOrder API 返回:', res)
+  }).catch(err => {
+    console.error('createUserOrder API 错误:', err)
+  })
+  return promise
+}
+//更新订单收货地址
+export const updateOrderAddress = (userId: number, orderId: number, shippingAddress: any): Promise<any> => {
+  console.log('========== updateOrderAddress API 调用 ==========')
+  console.log('URL:', `/order/${userId}/${orderId}/address`)
+  console.log('shippingAddress:', shippingAddress)
+  return service.put(`/order/${userId}/${orderId}/address`, { shipping_address: shippingAddress })
 }
 //获取用户订单列表
 export const getUserOrders = (userId:number,userRole:string,page:number,pageSize:number,status:string,filter?: {
@@ -22,8 +38,12 @@ export const updateUserOrderStatus = (userId:number,orderId:number,userRole:stri
 export const cancelOrder = (userId:number,orderId:number,userRole:string):Promise<any> => {
   return service.post(`/order/${userId}/${orderId}/cancel`,{},{params:{userRole}})
 }
+//进入支付页面
+export const enterPaymentPage = (userId:number, orderId:number):Promise<any> => {
+  return service.post(`/order/${userId}/${orderId}/enterPayment`)
+}
 //支付
-export const processPayment = (userId:number,orderId:number,payment_method:string,payment_id:number):Promise<any> => {
+export const processPayment = (userId:number,orderId:number,payment_method:string,payment_id:string):Promise<any> => {
   return service.post(`/order/${userId}/${orderId}/pay`,{payment_method,payment_id})
 }
 //卖家发货

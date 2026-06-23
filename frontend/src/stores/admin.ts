@@ -91,7 +91,7 @@ export const useAdminStore = defineStore('admin', () => {
   //买家详情
   const buyerDetail = ref<any>(null)
   //已送达订单
-  const deliveryOrders = useStorage<Order[]>('deliveryOrders',[])
+  const deliveryOrders = ref<Order[]>([])
 
   //获取用户总数
   const fetchUsers = async () => {
@@ -129,7 +129,7 @@ export const useAdminStore = defineStore('admin', () => {
   //获取管理员列表
   const fetchAdminList = async () => {
     try {
-      const adminData = await getAdminListApi(authStore.userId!)
+      const adminData = await getAdminListApi(authStore.userId || 1)
       if(adminData) {
         adminList.value = adminData
       }
@@ -140,7 +140,7 @@ export const useAdminStore = defineStore('admin', () => {
   //添加管理员
   const addAdmin = async (adminId:number,data:{username:string,phone:string}) => {
     try {
-      const res = await setAdminApi(data,adminId)
+      const res = await setAdminApi(data,adminId || (authStore.userId || 1))
       if(res) {
         console.log('添加管理员成功')
         await fetchAdminList()
@@ -154,7 +154,7 @@ export const useAdminStore = defineStore('admin', () => {
   //取消管理权限
   const cancelAdmin = async (id:number,userId:number) => {
     try {
-      const res = await cancelAdminApi(id,userId)
+      const res = await cancelAdminApi(id,userId || (authStore.userId || 1))
       if(res) {
         ElMessage.success('取消管理权限成功')
         await fetchAdminList()
@@ -166,9 +166,14 @@ export const useAdminStore = defineStore('admin', () => {
   //获得商家列表
   const fetchSellers = async (page:number,pageSize:number) => {
     try {
-      const res = await getShopListApi(authStore.userId!,page,pageSize)
-      if(res) {
-        shopList.value = res.data
+      const res = await getShopListApi(authStore.userId || 1,page,pageSize)
+      if(res && res.data) {
+        // 确保 id 和 status 字段转换为数字类型
+        shopList.value = res.data.map((item: any) => ({
+          ...item,
+          id: Number(item.id),
+          status: Number(item.status)
+        }))
       }
     }catch (e) {
       console.log('前端获取商家列表失败',e)
@@ -177,7 +182,7 @@ export const useAdminStore = defineStore('admin', () => {
   //冻结商家权限
   const freezeSeller = async (id:number,reason:string) => {
     try {
-      const res = await freezeShopApi(reason,id)
+      const res = await freezeShopApi(id, reason)
       if(res) {
         ElMessage.success('冻结商家权限成功')
         await fetchSellers(1,10)
@@ -194,7 +199,7 @@ export const useAdminStore = defineStore('admin', () => {
       const res = await unfreezeShopApi(id)
       if(res) {
         ElMessage.success('解冻商家权限成功')
-        await fetchSellers(1,8)
+        await fetchSellers(1,10)
       }
     }catch (e) {
       console.log('前端解冻商家权限失败',e)
@@ -204,7 +209,7 @@ export const useAdminStore = defineStore('admin', () => {
   //获取买家列表
   const fetchBuyers = async (page:number,pageSize:number) => {
     try {
-      const res = await getBuyerListApi(authStore.userId!,page,pageSize)
+      const res = await getBuyerListApi(authStore.userId || 1,page,pageSize)
       if(res) {
         buyerList.value = res.data
         total.value = res.pagination.total
@@ -217,7 +222,7 @@ export const useAdminStore = defineStore('admin', () => {
   //获取买家详情
   const fetchBuyerDetail = async (buyerId:number) => {
     try {
-      const res = await getBuyerDetailApi(authStore.userId!,buyerId)
+      const res = await getBuyerDetailApi(authStore.userId || 1,buyerId)
       if(res) {
         buyerDetail.value = res
       }
@@ -229,7 +234,7 @@ export const useAdminStore = defineStore('admin', () => {
   //注销买家账号
   const deleteBuyer = async (buyerId:number,reason:string) => {
     try {
-      const res = await deleteBuyerApi(authStore.userId!,buyerId,reason)
+      const res = await deleteBuyerApi(authStore.userId || 1,buyerId,reason)
       if(res) {
         ElMessage.success('注销买家账号成功')
         await fetchBuyers(1,10)
@@ -243,7 +248,7 @@ export const useAdminStore = defineStore('admin', () => {
   const banBuyer = async (buyerId:number,reason:string) => {
     try {
       console.log('调用banBuyerApi，buyerId:', buyerId, 'reason:', reason)
-      const res = await banBuyerApi(authStore.userId!,buyerId,reason)
+      const res = await banBuyerApi(authStore.userId || 1,buyerId,reason)
       console.log('banBuyerApi返回:', res)
       if(res) {
         ElMessage.success('封禁买家账号成功')
@@ -260,8 +265,10 @@ export const useAdminStore = defineStore('admin', () => {
   //解封买家账号
   const unbanBuyer = async (buyerId:number) => {
     try {
+      console.log('调用unbanBuyerApi，authStore.userId:', authStore.userId)
       console.log('调用unbanBuyerApi，buyerId:', buyerId)
-      const res = await unbanBuyerApi(authStore.userId!,buyerId)
+      console.log('调用unbanBuyerApi，adminId参数:', authStore.userId || 1)
+      const res = await unbanBuyerApi(authStore.userId || 1,buyerId)
       console.log('unbanBuyerApi返回:', res)
       if(res) {
         ElMessage.success('解封买家账号成功')
@@ -269,9 +276,12 @@ export const useAdminStore = defineStore('admin', () => {
         await fetchBuyers(1,10)
         console.log('重新获取买家详情')
         await fetchBuyerDetail(buyerId)
+      } else {
+        ElMessage.error('解封买家账号失败')
       }
-    }catch (e) {
+    }catch (e:any) {
       console.log('前端解封买家账号失败',e)
+      ElMessage.error(e.response?.data?.message || '解封买家账号失败')
     }
   }
   //获取已送达的订单
@@ -281,11 +291,12 @@ export const useAdminStore = defineStore('admin', () => {
       if(res) {
         console.log('Received delivered orders:', res);
         // 查看第一个订单的结构
-        if (res.length > 0) {
+        if (Array.isArray(res) && res.length > 0) {
           console.log('First delivered order structure:', res[0]);
           console.log('First delivered order shipping_address:', res[0].shipping_address);
         }
-        deliveryOrders.value = res
+        // 强制更新数组引用，确保页面刷新
+        deliveryOrders.value = Array.isArray(res) ? [...res] : []
       }else {
         console.log('获取已送达订单失败')
       }

@@ -51,8 +51,9 @@ export const BookModel = {
         const params:any[] = ['available', 'approved']
         //搜索框筛选
         if(keyword) {
-            where += ' AND MATCH(title, author, publisher, description) AGAINST(? IN NATURAL LANGUAGE MODE)';
-            params.push(keyword)
+            where += ' AND (title LIKE ? OR author LIKE ? OR publisher LIKE ? OR description LIKE ?)';
+            const keywordPattern = `%${keyword}%`;
+            params.push(keywordPattern, keywordPattern, keywordPattern, keywordPattern)
         }
         if(categoryId) {
             where += ' AND category_id = ?'
@@ -85,6 +86,11 @@ export const BookModel = {
     },
     //商家上架图书
     async addBook(bookData:any) {
+        // 处理cover_image字段，如果是数组则转换为JSON字符串
+        const coverImage = Array.isArray(bookData.cover_image) ? JSON.stringify(bookData.cover_image) : bookData.cover_image;
+        // 处理images字段，如果是数组则转换为JSON字符串
+        const images = Array.isArray(bookData.images) ? JSON.stringify(bookData.images) : bookData.images;
+        
         const sql = `INSERT INTO books (
                    title,
                    highlights,
@@ -97,10 +103,11 @@ export const BookModel = {
                    description,
                    price,
                    cover_image,
+                   images,
                    seller_id,
                    merchant_id,
-                   review_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
-        const [rows] = await pool.execute(sql,[bookData.title,bookData.highlights,bookData.author,bookData.publisher,bookData.category_id,bookData.publish_year,bookData.original_price,bookData.book_condition,bookData.description,bookData.price,bookData.cover_image,bookData.seller_id,bookData.merchant_id,'pending']);
+                   review_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+        const [rows] = await pool.execute(sql,[bookData.title,bookData.highlights,bookData.author,bookData.publisher,bookData.category_id,bookData.publish_year,bookData.original_price,bookData.book_condition,bookData.description,bookData.price,coverImage,images,bookData.seller_id,bookData.merchant_id,'pending']);
         return rows;
     },
     //商家下架图书
@@ -158,6 +165,81 @@ export const BookModel = {
         const transactionMethods = enabled ? JSON.stringify(['face_to_face']) : null;
         const sql = `UPDATE books SET transaction_methods = ? WHERE merchant_id = ? AND status = 'available'`;
         const [rows] = await pool.execute(sql, [transactionMethods, merchantId]);
+        return rows;
+    },
+    // 获取所有图书
+    async getAllBooks(opts: {
+        page: number,
+        pageSize: number,
+        keyword?: string,
+        categoryId?: number,
+        status?: string,
+        author?: string
+    }) {
+        const { page, pageSize, keyword, categoryId, status, author } = opts;
+        const offset = (page - 1) * pageSize;
+        let query = `SELECT b.*, u.username as seller_username FROM books as b LEFT JOIN users as u ON b.seller_id = u.id`;
+        const params: any[] = [];
+        let where = '';
+        
+        if (keyword) {
+            where += where ? ' AND ' : ' WHERE ';
+            where += 'MATCH(b.title, b.author, b.publisher, b.description) AGAINST(? IN NATURAL LANGUAGE MODE)';
+            params.push(keyword);
+        }
+        
+        if (categoryId) {
+            where += where ? ' AND ' : ' WHERE ';
+            where += 'b.category_id = ?';
+            params.push(categoryId);
+        }
+        
+        if (status) {
+            where += where ? ' AND ' : ' WHERE ';
+            where += 'b.status = ?';
+            params.push(status);
+        }
+        
+        if (author) {
+            where += where ? ' AND ' : ' WHERE ';
+            where += 'b.author LIKE ?';
+            params.push(`%${author}%`);
+        }
+        
+        query += where + ' ORDER BY b.created_at DESC LIMIT ? OFFSET ?';
+        // 保存查询参数（不包含分页参数）
+        const queryParams = [...params];
+        
+        // 添加分页参数
+        params.push(pageSize, offset);
+        
+        const [rows] = await pool.query(query, params);
+        
+        let countQuery = `SELECT COUNT(*) as total FROM books`;
+        
+        if (where) {
+            countQuery += where;
+        }
+        
+        const [total] = await pool.query(countQuery, queryParams) as [any, any];
+        
+        return {
+            books: rows,
+            total: total[0].total,
+            page,
+            pageSize
+        };
+    },
+    // 下架图书
+    async removeBook(bookId: number) {
+        const sql = `UPDATE books SET status = 'pending' WHERE id = ?`;
+        const [rows] = await pool.execute(sql, [bookId]);
+        return rows;
+    },
+    // 上架图书
+    async publishBook(bookId: number) {
+        const sql = `UPDATE books SET status = 'available' WHERE id = ?`;
+        const [rows] = await pool.execute(sql, [bookId]);
         return rows;
     }
 }

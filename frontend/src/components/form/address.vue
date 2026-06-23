@@ -18,9 +18,10 @@ const ruleForm = reactive<Omit<RuleForm, 'id'>>({
   userId: authStore.userId || 0,
   username: '',
   phone: 0,
-  school: '金陵科技学院',
+  school: '某某大学',
   address: '',
-  isDefault:false
+  isDefault:false,
+  isShippingAddress:false
 })
 //表单验证规则
 const rules = reactive<FormRules<RuleForm>>({
@@ -59,7 +60,8 @@ const initializeForm = () => {
       username:props.originalData.username,
       phone:props.originalData.phone,
       address:props.originalData.address,
-      isDefault:props.originalData.isDefault ?? false
+      isDefault:props.originalData.isDefault ?? false,
+      isShippingAddress:props.originalData.isShippingAddress ?? false
     })
     /*isDefault.value = props.originalData?.isDefault ?? false*/
   } else {
@@ -68,7 +70,8 @@ const initializeForm = () => {
       username:'',
       phone:0,
       address:'',
-      isDefault:false
+      isDefault:false,
+      isShippingAddress:false
     })
     /*isDefault.value = false*/
     originalDataClone.value = null
@@ -105,7 +108,8 @@ const submit = () => {
     username: ruleForm.username,
     phone: ruleForm.phone,
     address: ruleForm.address,
-    isDefault: ruleForm.isDefault
+    isDefault: ruleForm.isDefault,
+    isShippingAddress: ruleForm.isShippingAddress
   }
   const finalData = props.mode === 'edit' ? {id: props.originalData?.id,...getChangeFields(),userId:userId} : addressData
   emit('submit',finalData)
@@ -137,7 +141,7 @@ const title = computed(() => props.mode === 'edit' ? '编辑地址' : '添加地
             <el-input v-model="ruleForm.address" placeholder="请输入详细地址" />
           </el-form-item>
           <el-form-item style="margin-bottom: 16px;margin-left: 14px">
-            <el-checkbox v-model="ruleForm.isDefault">设为默认收货地址</el-checkbox>
+            <el-checkbox v-if="authStore.isSeller" v-model="ruleForm.isShippingAddress">设为发货地址</el-checkbox>
           </el-form-item>
           <el-form-item style="margin-bottom: 24px; padding-left: 388px">
             <el-button style="padding: 8px 16px" @click="closeAddress">取消</el-button>

@@ -7,7 +7,7 @@ export const BookReviewModel = {
   async getPendingBooks(page: number, pageSize: number) {
     const offset = (page - 1) * pageSize;
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT * FROM books WHERE review_status = 'pending' ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT b.*, u.username as seller_username FROM books as b LEFT JOIN users as u ON b.seller_id = u.id WHERE b.review_status = 'pending' ORDER BY b.created_at DESC LIMIT ? OFFSET ?`,
       [pageSize, offset]
     );
     

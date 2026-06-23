@@ -66,7 +66,7 @@ onMounted(async () => {
       <div class="coupon__list">
         <div class="coupon__item" v-for="(item,id) in couponStore.coupon" :key="id">
           <div class="item__left">
-            <p>{{item.merchant_name}} <span style="font-size: 12px">{{ item.coupon_type }}</span></p>
+            <p>{{item.merchant_name.replace(' amount', '')}}</p>
             <div>
               <p><span style="font-size: 20px;margin-right: 4px">￥{{item.discount}}</span><span style="font-size: 12px">{{ item.coupon_title }}</span></p>
               <p style="color: #000000; font-size: 12px">{{ new Date(item.use_start).toLocaleDateString('zh-CN') }}-{{ new Date(item.use_end).toLocaleDateString('zh-CN') }}</p>
@@ -98,45 +98,102 @@ onMounted(async () => {
 .coupon__list {
   display: flex;
   flex-wrap: wrap;
-  flex-direction: row;
+  gap: 16px;
   margin-bottom: 24px;
+  padding: 0 8px;
 }
 .coupon__item {
   display: flex;
-  width: 30%;
-  height: 160px;
-  background: #fadbdb;
-  padding: 0 0 0 4px;
-  margin: 0 8px;
+  width: calc(33.333% - 16px);
+  height: 180px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
   .item__left {
-    flex: 10;
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    
     div {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
     }
   }
+  
   .item__right {
-    flex: 1;
+    width: 80px;
     background: #FF4B60;
-    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+    
     &:hover {
-      cursor: pointer;
+      background: #ff3742;
     }
+    
     p {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
+      writing-mode: vertical-rl;
+      text-orientation: upright;
       color: white;
+      font-weight: 600;
+      letter-spacing: 2px;
     }
   }
 }
 .item__left > p {
-  padding: 4px 0;
-  border-bottom: 1px dotted #2c0f0f;
   font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #dee2e6;
+  
+  span {
+    margin-left: 8px;
+    color: #6c757d;
+    font-weight: normal;
+  }
+}
+.item__left div p:first-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: #212529;
   margin-bottom: 8px;
-  margin-right: 4px;
+  
+  span:first-child {
+    font-size: 24px;
+    color: #FF4B60;
+    font-weight: 700;
+  }
+}
+.item__left div p:last-child {
+  font-size: 12px;
+  color: #6c757d;
+  margin: 0;
+}
+
+// 响应式设计
+@media (max-width: 768px) {
+  .coupon__item {
+    width: calc(50% - 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  .coupon__item {
+    width: 100%;
+  }
 }
 </style>

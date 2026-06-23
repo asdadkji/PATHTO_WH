@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onMounted, ref,} from "vue";
+import {onMounted, ref, watch} from "vue";
 import myaddress from '@/components/form/address.vue'
 //引入地址仓库
 import {useAddressStore} from '@/stores/address.ts'
@@ -7,6 +7,9 @@ const addressStore = useAddressStore()
 //引入用户仓库
 import {useAuthStore} from '@/stores/auth.ts'
 const authStore = useAuthStore()
+//引入订单仓库
+import {useOrderStore} from '@/stores/orders.ts'
+const orderStore = useOrderStore()
 //ts
 import type{updateAddress} from "@/types/store/address.ts"
 //判定是否展示表单
@@ -47,6 +50,39 @@ const handleSubmit = (formData:any) => {
   }
   handleCloseAddress()
 }
+
+// 监听地址选择变化，更新订单地址
+watch(() => addressStore.selectedAddressId, async (newAddressId, oldAddressId) => {
+  console.log('========== 地址选择变化 ==========')
+  console.log('oldAddressId:', oldAddressId)
+  console.log('newAddressId:', newAddressId)
+  console.log('orderStore.currentPendingOrderId:', orderStore.currentPendingOrderId)
+  
+  // 只有在有 pending 订单时才更新
+  if (newAddressId && newAddressId !== oldAddressId && orderStore.currentPendingOrderId) {
+    const selectedAddress = addressStore.getAddressById(Number(newAddressId))
+    if (selectedAddress) {
+      console.log('selectedAddress:', selectedAddress)
+      const shippingAddress = {
+        username: selectedAddress.username,
+        phone: selectedAddress.phone,
+        detailAddress: selectedAddress.address
+      }
+      
+      console.log('准备更新订单地址:', shippingAddress)
+      console.log('订单ID:', orderStore.currentPendingOrderId)
+      console.log('用户ID:', authStore.userId)
+      
+      try {
+        const { updateOrderAddress } = await import('@/apis/services/order')
+        const res = await updateOrderAddress(authStore.userId!, orderStore.currentPendingOrderId, shippingAddress)
+        console.log('更新订单地址成功:', res)
+      } catch (e) {
+        console.error('更新订单地址失败:', e)
+      }
+    }
+  }
+})
 </script>
 
 <template>
@@ -72,8 +108,8 @@ const handleSubmit = (formData:any) => {
           <div class="select__item">
             <div class="select__item__info">
               <span>{{addr.username}}</span>
-              <span>金陵科技学院</span>
-              <span>{{addr.phone}}</span>
+              <span>某某大学</span>
+              <span>{{addr.phone.toString().replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}}</span>
               <span>{{addr.address}}</span>
             </div>
             <span @click.prevent="openEditForm(addr)">修改</span>

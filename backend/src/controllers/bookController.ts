@@ -59,9 +59,14 @@ export const deleteBooks = async (req: Request, res: Response) => {
         const bookId = Number(req.params.bookId);
         const merchantId = Number(req.params.merchantId);
         const data = await BookService.deleteBook(bookId,merchantId);
-        res.json({code:0, data, message:'下架成功'})
+        if (data && data.code === 1) {
+            res.json(data);
+        } else {
+            res.json({code:0, data, message:'下架成功'});
+        }
     } catch (e) {
-        console.log('下架失败',e)
+        console.log('下架失败',e);
+        res.json({code:1, message:'下架失败'});
     }
 }
 //商家图书展示
@@ -71,7 +76,7 @@ export const getMerchantBooks = async (req: Request, res: Response) => {
         const page = Number(req.query.page) || 1;
         const size = Number(req.query.size) || 10;
         const filter = {
-            status:req.query.status as string|| 'available',
+            status:req.query.status as string || undefined,
             author: req.query.author as string || undefined,
             title: req.query.title as string || undefined,
             category_id: req.query.category_id ? parseInt(req.query.category_id as string) : undefined,

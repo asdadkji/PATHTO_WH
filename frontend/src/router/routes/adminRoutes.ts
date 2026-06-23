@@ -129,7 +129,27 @@ export default [
     component: () => import('@/views/Admin/components/bookReview.vue'), // 路由懒加载
     meta: {
       requireAdmin: true,
-      title: '图书审查',
+      title: '图书审核',
+      allowedRoles:['admin','maxAdmin']
+    },
+    beforeEnter: (to:any, from:any, next:any) => {
+      const authStore = useAuthStore();
+      if (authStore.isMaxAdmin || authStore.isAdmin) {
+        next();
+        return;
+      } else {
+        next('/403');
+        return
+      }
+    }
+  },
+  {
+    path: 'bookMgt',
+    name: 'bookMgt',
+    component: () => import('@/views/Admin/components/bookMgt.vue'), // 路由懒加载
+    meta: {
+      requireAdmin: true,
+      title: '图书管理',
       allowedRoles:['admin','maxAdmin']
     },
     beforeEnter: (to:any, from:any, next:any) => {

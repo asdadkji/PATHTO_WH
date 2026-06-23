@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onMounted, reactive, ref, watch} from 'vue'
 
-import type { FormRules } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import dayjs from 'dayjs';
 //解决日期层级问题
 const popperOptions = {
@@ -60,26 +60,39 @@ const rules = reactive<FormRules>({
 })
 //判定表单展开
 const isShowForm = ref(false)
+//表单引用
+const ruleFormRef = ref<FormInstance>()
 //引入优惠券仓库
 import { useCouponStore } from '@/stores/coupon'
 const couponStore = useCouponStore()
 //提交优惠券
-const submitForm = () => {
-  const data = {
-    merchant_id:1,
-    title: ruleForm.title,
-    type:'amount',
-    full_amount: ruleForm.price,
-    discount: ruleForm.discount,
-    total_cnt: ruleForm.number,
-    per_limit: ruleForm.limit,
-    receive_start: dayjs(ruleForm.day[0]).format('YYYY-MM-DD HH:mm:ss'),
-    receive_end: dayjs(ruleForm.day[1]).format('YYYY-MM-DD HH:mm:ss'),
-    use_start: dayjs(ruleForm.date[0]).format('YYYY-MM-DD HH:mm:ss'),
-    use_end: dayjs(ruleForm.date[1]).format('YYYY-MM-DD HH:mm:ss')
-  }
-  couponStore.addCoupon(data)
-  cancelForm()
+const submitForm = async () => {
+  if (!ruleFormRef.value) return
+  await ruleFormRef.value.validate(async (valid) => {
+    if (valid) {
+      const data = {
+        merchant_id:1,
+        title: ruleForm.title,
+        type:'amount',
+        full_amount: ruleForm.price,
+        discount: ruleForm.discount,
+        total_cnt: ruleForm.number,
+        per_limit: ruleForm.limit,
+        receive_start: dayjs(ruleForm.day[0]).format('YYYY-MM-DD HH:mm:ss'),
+        receive_end: dayjs(ruleForm.day[1]).format('YYYY-MM-DD HH:mm:ss'),
+        use_start: dayjs(ruleForm.date[0]).format('YYYY-MM-DD HH:mm:ss'),
+        use_end: dayjs(ruleForm.date[1]).format('YYYY-MM-DD HH:mm:ss')
+      }
+      try {
+        await couponStore.addCoupon(data)
+        cancelForm()
+      } catch (e) {
+        console.error('创建优惠券失败:', e)
+      }
+    } else {
+      console.log('表单验证失败')
+    }
+  })
 }
 //撤销优惠券创建
 const cancelForm = () => {
@@ -185,7 +198,7 @@ const handleFilter = () => {
           <div class="coupon__form__basicInfo">
             <span style="font-size: 18px;font-weight: bold">优惠券信息</span>
             <div class="basicInfo__form">
-              <el-form :label-position="'right'" style="max-width: 600px;margin-top: 24px" label-width="auto" :model="ruleForm" :rules="rules">
+              <el-form ref="ruleFormRef" :label-position="'right'" style="max-width: 600px;margin-top: 24px" label-width="auto" :model="ruleForm" :rules="rules">
                 <el-form-item label="优惠券名称" style="margin-right: 8px; margin-bottom: 24px" prop="title">
                   <el-input style="width: 200px" v-model="ruleForm.title"></el-input>
                 </el-form-item>

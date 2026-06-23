@@ -87,7 +87,7 @@ export const CouponModel = {
             total_cnt,
             per_limit
         FROM coupon_batch
-        WHERE merchant_id = ?
+        WHERE merchant_id = ? AND status = 1
         `;
         const [rows] = await pool.execute(query, [merchantId])
         return rows as DBCouponBatch[]

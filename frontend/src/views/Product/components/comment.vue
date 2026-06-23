@@ -9,6 +9,12 @@ onMounted(() => {
   reviewStore.getReviews(1)
 })
 
+// 将标签英文值转换为中文名称
+const getTagName = (tagValue: string): string => {
+  const tag = reviewStore.ALL_TAGS.find(t => t.value === tagValue)
+  return tag ? tag.name : tagValue
+}
+
 </script>
 
 <template>
@@ -35,7 +41,7 @@ onMounted(() => {
           <span>{{item?.book_snapshot?.title}}</span>
           <p>{{item?.comment}}</p>
           <div style="margin: 14px 0">
-            <el-tag type="info" style="font-size: 12px;margin-right: 8px;" v-for="(tag,id) in item.tags" :key="id">{{tag}}</el-tag>
+            <el-tag type="info" style="font-size: 12px;margin-right: 8px;" v-for="(tag,id) in item.tags" :key="id">{{getTagName(tag)}}</el-tag>
           </div>
           <p style="margin-top: -8px">{{dayjs(item.created_at).format('YYYY-MM-DD HH:mm')}}</p>
         </div>

@@ -75,8 +75,12 @@ export const useCouponStore = defineStore('coupon', () => {
         throw new Error('商家优惠券数量已达上限')
       }
       const res = await createCoupon(couponData)
-    } catch (e) {
+      console.log('创建优惠券成功', res)
+      await getSellerCoupons(1)
+      return res
+    } catch (e:any) {
       console.log('创建优惠券失败', e)
+      throw e
     }
   }
   //商家启用优惠券

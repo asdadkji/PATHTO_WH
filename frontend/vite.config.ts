@@ -61,6 +61,22 @@ export default defineConfig({
             console.log('[Proxy] >', req.method, original);
           });
         }
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p,
+        configure: (proxy, options) => {
+          proxy.on('error', (err) => console.log('[Proxy /uploads] error:', err));
+          proxy.on('proxyReq', (req) => {
+            const original = (req as any).headers?.['x-original-url'] || req.path || (req as any).url || '';
+            console.log('[Proxy /uploads] >', req.method, original, '->', options.target + original);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('[Proxy /uploads] <', proxyRes.statusCode, req.url);
+          });
+        }
       }
     }
   },
