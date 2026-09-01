@@ -7,8 +7,4 @@ export const ENV = {
     DB_POOL_MIN: process.env.DB_POOL_MIN,
     DB_POOL_MAX: process.env.DB_POOL_MAX,
     DB_PASSWORD: process.env.DB_PASSWORD,
-    REDIS_HOST: process.env.REDIS_HOST,
-    REDIS_PORT: process.env.REDIS_PORT,
-    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
-    REDIS_DB: process.env.REDIS_DB
 } as const;

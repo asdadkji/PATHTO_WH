@@ -1,2 +1,12 @@
-export * from './services'
-export { default as http } from './http';
+// apis 模块统一出口
+export { default as http } from './http'
+export * from './auth'
+export * from './user'
+export * from './dashboard'
+export * from './task'
+export * from './timer'
+export * from './time'
+export * from './product'
+export * from './cart'
+export * from './redemption'
+export * from './admin'
