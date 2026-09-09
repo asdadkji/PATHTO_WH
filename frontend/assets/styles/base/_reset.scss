@@ -1,0 +1,33 @@
+@use '../abstracts/variables' as *;
+
+// 重置所有元素的默认样式
+// 重置所有元素的边距和盒模型
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+// 设置基础Body样式
+body {
+  font-family: $font-family-base;
+  font-size: $font-size-base;
+  line-height: 1.5;
+  color: #333;
+  background-color: #fff;
+}
+
+// 移除列表样式
+ul, ol {
+  list-style: none;
+}
+
+// 链接基础样式
+a {
+  color: $primary-color;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

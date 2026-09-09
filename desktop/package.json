@@ -1,0 +1,45 @@
+{
+  "name": "kids-task-reward-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "prepare": "node scripts/prepare.js",
+    "pack": "npm run prepare && electron-builder --dir",
+    "dist": "npm run prepare && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.kids.taskreward",
+    "productName": "KidsTaskReward",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "build/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/server",
+        "to": "server",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "build/web",
+        "to": "web",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
