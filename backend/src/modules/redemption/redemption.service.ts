@@ -23,6 +23,17 @@ export interface RedemptionListItem {
   pointsUsed: number;
 }
 
+// 购物车批量结算返回
+export interface CheckoutResult {
+  redemptions: Array<{
+    redemptionId: string;
+    productId: string;
+    productName: string;
+    pointsUsed: number;
+  }>;
+  totalPointsUsed: number;
+}
+
 class RedemptionService {
   // POST /api/redemption/submit：提交兑换申请（事务）
   // 校验商品上架+库存+积分 → INSERT redemption → 扣积分+写流水 → 扣库存
@@ -258,6 +269,154 @@ class RedemptionService {
       if (conn) conn.release();
     }
   }
+
+  // POST /api/redemption/checkout：购物车批量结算（事务）
+  // 校验所有商品上架+库存+积分 → 批量 INSERT redemption(status='pending') → 扣积分+写流水 → 扣库存 → 清空购物车
+  // 审核由已有管理员端点处理：approve → approved；reject → 事务退还积分+库存
+  async checkoutFromCart(
+    userId: string,
+    items: Array<{ productId: string; quantity: number }>,
+  ): Promise<CheckoutResult> {
+    // 1. 批量查商品信息（一次查询，避免 N+1）
+    const productIds = items.map((i) => i.productId);
+    const [pRows] = await pool.query<RowDataPacket[]>(
+      `SELECT product_id, name, price_points, stock, is_active
+       FROM products
+       WHERE product_id IN (${productIds.map(() => '?').join(',')})`,
+      productIds,
+    );
+    const productMap = new Map<string, RowDataPacket>();
+    for (const p of pRows) {
+      productMap.set(p.product_id, p);
+    }
+
+    // 2. 预校验：每个商品必须存在且上架，库存充足
+    let totalPointsUsed = 0;
+    const validatedItems: Array<{
+      productId: string;
+      productName: string;
+      quantity: number;
+      pricePoints: number;
+      stock: number;
+      pointsUsed: number;
+    }> = [];
+
+    for (const item of items) {
+      const product = productMap.get(item.productId);
+      if (!product || !product.is_active) {
+        throw new HttpError(400, `商品 ${item.productId} 不可兑换`, 400);
+      }
+      const pricePoints = Number(product.price_points) || 0;
+      const stock = Number(product.stock) || 0;
+      const pointsUsed = pricePoints * item.quantity;
+
+      if (stock !== -1 && stock < item.quantity) {
+        throw new HttpError(400, `商品 ${product.name} 库存不足`, 400);
+      }
+
+      totalPointsUsed += pointsUsed;
+      validatedItems.push({
+        productId: item.productId,
+        productName: product.name,
+        quantity: item.quantity,
+        pricePoints,
+        stock,
+        pointsUsed,
+      });
+    }
+
+    // 3. 校验用户积分
+    const [uRows] = await pool.query<RowDataPacket[]>(
+      `SELECT total_points FROM users WHERE user_id = ? LIMIT 1`,
+      [userId],
+    );
+    const userTotal = Number(uRows[0]?.total_points) || 0;
+    if (userTotal < totalPointsUsed) {
+      throw new HttpError(400, '积分不足', 400);
+    }
+
+    // 4. 事务：批量创建兑换订单 → 扣积分 → 写流水 → 扣库存 → 清空购物车
+    let conn: PoolConnection | undefined;
+    const redemptions: CheckoutResult['redemptions'] = [];
+    try {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      // 4.1 遍历创建每条兑换记录（status='pending'，等待管理员审核）
+      for (const vi of validatedItems) {
+        const redemptionId = randomUUID();
+        await conn.query(
+          `INSERT INTO redemptions
+             (redemption_id, user_id, product_id, quantity, total_points_used, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          [redemptionId, userId, vi.productId, vi.quantity, vi.pointsUsed, RedemptionStatus.Pending],
+        );
+        redemptions.push({
+          redemptionId,
+          productId: vi.productId,
+          productName: vi.productName,
+          pointsUsed: vi.pointsUsed,
+        });
+      }
+
+      // 4.2 一次性扣减用户积分
+      await conn.query(
+        `UPDATE users SET total_points = total_points - ? WHERE user_id = ?`,
+        [totalPointsUsed, userId],
+      );
+
+      // 4.3 查扣减后余额
+      const [bRows] = await conn.query<RowDataPacket[]>(
+        `SELECT total_points FROM users WHERE user_id = ? LIMIT 1`,
+        [userId],
+      );
+      const balanceAfter = Number(bRows[0]?.total_points) || 0;
+
+      // 4.4 为每个商品写积分流水
+      for (const r of redemptions) {
+        await conn.query(
+          `INSERT INTO point_logs
+             (log_id, user_id, change_amount, balance_after, source_type, source_id, description, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [randomUUID(), userId, -r.pointsUsed, balanceAfter, 'redemption', r.redemptionId, '购物车兑换'],
+        );
+      }
+
+      // 4.5 扣减库存（无限库存 stock=-1 跳过）
+      for (const vi of validatedItems) {
+        if (vi.stock !== -1) {
+          await conn.query(
+            `UPDATE products SET stock = stock - ? WHERE product_id = ?`,
+            [vi.quantity, vi.productId],
+          );
+        }
+      }
+
+      // 4.6 清空购物车
+      const [cRows] = await conn.query<RowDataPacket[]>(
+        `SELECT cart_id FROM carts WHERE user_id = ? LIMIT 1`,
+        [userId],
+      );
+      if (cRows.length > 0) {
+        await conn.query(`DELETE FROM cart_items WHERE cart_id = ?`, [cRows[0].cart_id]);
+      }
+
+      await conn.commit();
+      return { redemptions, totalPointsUsed };
+    } catch (_err) {
+      if (conn) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* 忽略回滚过程中的二次错误 */
+        }
+      }
+      throw new HttpError(500, '购物车结算失败', 500);
+    } finally {
+      if (conn) conn.release();
+    }
+  }
+
   // PUT /api/redemption/:id/use：用户"立即使用"已批准的兑换（approved → completed）
   // 仅 approved 可使用；订单不存在或不属于当前用户均 404
   async useRedemption(

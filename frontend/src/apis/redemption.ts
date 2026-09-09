@@ -5,6 +5,8 @@
 import http from '@/apis/http'
 import type {
   CancelResult,
+  CheckoutPayload,
+  CheckoutResult,
   RedemptionListItem,
   RedemptionStatus,
   SubmitRedemptionPayload,
@@ -19,6 +21,16 @@ import type {
  */
 export function submitRedemption(data: SubmitRedemptionPayload) {
   return http.post('/redemption/submit', data) as unknown as Promise<SubmitResult>
+}
+
+/**
+ * 购物车批量结算：POST /api/redemption/checkout
+ * body: { items: [{ productId, quantity }] }
+ * → 成功 { redemptions: [{ redemptionId, productId, productName, pointsUsed }], totalPointsUsed }
+ * 失败：400 积分不足 / 400 库存不足 / 400 商品不可兑换
+ */
+export function checkoutFromCart(data: CheckoutPayload) {
+  return http.post('/redemption/checkout', data) as unknown as Promise<CheckoutResult>
 }
 
 /**

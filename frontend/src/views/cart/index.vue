@@ -5,7 +5,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Delete, Goods, Star } from '@element-plus/icons-vue'
-import { getCart, removeCartItem, updateCartItem } from '@/apis'
+import { getCart, removeCartItem, updateCartItem, checkoutFromCart } from '@/apis'
 import { useAuthStore } from '@/stores/auth'
 import type { CartItem } from '@/types'
 
@@ -105,6 +105,36 @@ function goShop() {
   router.push('/shop')
 }
 
+const checkoutLoading = ref(false)
+
+async function handleCheckout() {
+  if (!items.value.length || !enoughPoints.value) return
+  try {
+    await ElMessageBox.confirm(
+      `将使用 ${totalCost.value} 积分兑换 ${totalCount.value} 件商品，提交后需等待管理员审核。`,
+      '确认兑换',
+      { confirmButtonText: '确认兑换', cancelButtonText: '再想想', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+
+  checkoutLoading.value = true
+  try {
+    await checkoutFromCart({
+      items: items.value.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+    })
+    ElMessage.success('兑换已提交，请等待管理员审核')
+    await auth.refreshUserInfo()
+    router.push('/exchange')
+  } catch (e) {
+    ElMessage.error(pickMsg(e, '结算失败，请稍后重试'))
+    await loadCart()
+  } finally {
+    checkoutLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadCart()
 })
@@ -200,6 +230,13 @@ onMounted(() => {
             还差 {{ totalCost - totalPoints }} 积分，继续加油
           </span>
           <el-button type="primary" :icon="Goods" round @click="goShop">继续逛逛</el-button>
+          <el-button
+            type="warning"
+            round
+            :disabled="!enoughPoints"
+            :loading="checkoutLoading"
+            @click="handleCheckout"
+          >立即兑换</el-button>
         </div>
       </div>
     </section>

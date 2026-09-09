@@ -382,6 +382,31 @@ export interface UseRedemptionResult {
   status: 'completed'
 }
 
+/** 购物车结算单项 */
+export interface CheckoutItem {
+  productId: string
+  quantity: number
+}
+
+/** 购物车批量结算入参（POST /api/redemption/checkout body） */
+export interface CheckoutPayload {
+  items: CheckoutItem[]
+}
+
+/** 购物车结算单项结果 */
+export interface CheckoutRedemptionItem {
+  redemptionId: string
+  productId: string
+  productName: string
+  pointsUsed: number
+}
+
+/** 购物车批量结算响应 data（POST /api/redemption/checkout） */
+export interface CheckoutResult {
+  redemptions: CheckoutRedemptionItem[]
+  totalPointsUsed: number
+}
+
 /** 管理员批准兑换响应 data（PUT /api/admin/redemption/:id/approve） */
 export interface ApproveRedemptionResult {
   success: boolean

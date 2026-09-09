@@ -14,6 +14,16 @@ export const submitRedemption = asyncHandler(
   },
 );
 
+// POST /api/redemption/checkout：购物车批量结算（body 经 CheckoutDto 校验）
+export const checkoutFromCart = asyncHandler(
+  async (req: Request, res: Response, _next: NextFunction) => {
+    const userId = req.user!.userId;
+    const { items } = req.body;
+    const data = await redemptionService.checkoutFromCart(userId, items);
+    return success(res, data);
+  },
+);
+
 // GET /api/redemption/list：当前用户兑换记录（可选 query: status）
 export const listRedemptions = asyncHandler(
   async (req: Request, res: Response, _next: NextFunction) => {
