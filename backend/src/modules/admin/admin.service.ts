@@ -8,6 +8,27 @@ import { RedemptionStatus, TaskType, ProductCategory } from '@/types/enums';
 // 合法的兑换状态枚举值列表（用于 status 过滤校验）
 const REDEMPTION_STATUSES = Object.values(RedemptionStatus) as string[];
 
+// 将 Date 按本地时区格式化为 'YYYY-MM-DD'。
+// 注意：不能用 toISOString()——它按 UTC 输出，UTC+8 本地午夜/早8点前会回退一天，
+// 与 MySQL CURDATE()/DATE 列的本地日期口径不一致，导致图表数据错位一天。
+function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// 生成近 n 天日期轴（含今天，旧→新），元素为本地 'YYYY-MM-DD'
+function lastNDates(n: number): string[] {
+  const dates: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(formatLocalDate(d));
+  }
+  return dates;
+}
+
 // 管理端兑换记录条目（含 userName）
 export interface AdminRedemptionListItem {
   redemptionId: string;
@@ -590,40 +611,32 @@ class AdminService {
   // 近7天积分与任务趋势（柱状折线混合图）
   async getWeeklyTrend() {
     const childId = await this.getChildUserId();
-    const labels: string[] = [];
+    // 日期轴统一用本地日期（与 MySQL CURDATE()/DATE 列口径一致）
+    const dates = lastNDates(7);
+    const labels: string[] = dates.map((s) => s.slice(5)); // MM-DD
     const taskCounts: number[] = [];
     const pointsEarned: number[] = [];
-
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
-      labels.push(dateStr.slice(5)); // MM-DD
-    }
 
     if (!childId) return { labels, taskCounts, pointsEarned };
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT DATE(date) AS d, COUNT(*) AS cnt,
+      `SELECT DATE_FORMAT(date, '%Y-%m-%d') AS d, COUNT(*) AS cnt,
               SUM(CASE WHEN status = 'completed' THEN points ELSE 0 END) AS pts
        FROM tasks
        WHERE user_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-       GROUP BY DATE(date)`,
+       GROUP BY DATE_FORMAT(date, '%Y-%m-%d')`,
       [childId],
     );
 
+    // DATE_FORMAT 直接返回 'YYYY-MM-DD' 字符串，避免 mysql2 把 DATE 解析成本地午夜
+    // Date 对象后再 toISOString() 按 UTC 取日期造成的错位一天
     const map = new Map<string, { cnt: number; pts: number }>();
     for (const r of rows) {
-      const key = r.d instanceof Date
-        ? r.d.toISOString().slice(0, 10)
-        : String(r.d).slice(0, 10);
+      const key = r.d instanceof Date ? formatLocalDate(r.d) : String(r.d).slice(0, 10);
       map.set(key, { cnt: Number(r.cnt) || 0, pts: Number(r.pts) || 0 });
     }
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+    for (const key of dates) {
       const entry = map.get(key);
       taskCounts.push(entry?.cnt ?? 0);
       pointsEarned.push(entry?.pts ?? 0);
@@ -635,40 +648,32 @@ class AdminService {
   // 近7天时间分配趋势（堆叠面积图）
   async getTimeTrend() {
     const childId = await this.getChildUserId();
-    const labels: string[] = [];
+    // 日期轴统一用本地日期（与 MySQL CURDATE()/DATE 列口径一致）
+    const dates = lastNDates(7);
+    const labels: string[] = dates.map((s) => s.slice(5)); // MM-DD
     const types = ['homework', 'game', 'reading', 'exercise', 'other'];
     const series: Record<string, number[]> = {};
     for (const t of types) series[t] = [];
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      labels.push(d.toISOString().slice(5, 10));
-    }
-
     if (!childId) return { labels, series };
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT DATE(date) AS d, activity_type, SUM(duration_minutes) AS mins
+      `SELECT DATE_FORMAT(date, '%Y-%m-%d') AS d, activity_type, SUM(duration_minutes) AS mins
        FROM time_records
        WHERE user_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-       GROUP BY DATE(date), activity_type`,
+       GROUP BY DATE_FORMAT(date, '%Y-%m-%d'), activity_type`,
       [childId],
     );
 
+    // DATE_FORMAT 直接返回 'YYYY-MM-DD' 字符串，避免时区错位（同 getWeeklyTrend）
     const map = new Map<string, Record<string, number>>();
     for (const r of rows) {
-      const key = r.d instanceof Date
-        ? r.d.toISOString().slice(0, 10)
-        : String(r.d).slice(0, 10);
+      const key = r.d instanceof Date ? formatLocalDate(r.d) : String(r.d).slice(0, 10);
       if (!map.has(key)) map.set(key, {});
       map.get(key)![r.activity_type] = Number(r.mins) || 0;
     }
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
+    for (const key of dates) {
       const entry = map.get(key) ?? {};
       for (const t of types) {
         series[t].push(entry[t] ?? 0);
@@ -752,52 +757,67 @@ class AdminService {
   }
 
   // 作业达标率仪表盘（本月）
+  // 达标口径：「当日全部作业记录时长之和」>= 作业目标分钟数。
+  // 注意不能按单条记录判定——一天可能分多次计时（如 14+10+10+13+7+3+3=60 分钟），
+  // 单条均未达标但当日合计已达标，按记录判定会漏算达标天数。
   async getHomeworkRate() {
     const childId = await this.getChildUserId();
     if (!childId) return { rate: 0, targetDays: 0, totalDays: 0 };
 
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT
-        u.homework_target_minutes,
-        COUNT(DISTINCT tr.date) AS target_days,
-        DAY(CURDATE()) AS total_days
-       FROM users u
-       LEFT JOIN time_records tr
-         ON tr.user_id = u.user_id
-         AND tr.activity_type = 'homework'
-         AND YEAR(tr.date) = YEAR(CURDATE())
-         AND MONTH(tr.date) = MONTH(CURDATE())
-         AND tr.duration_minutes >= u.homework_target_minutes
-       WHERE u.user_id = ?
-       GROUP BY u.homework_target_minutes`,
+    // 1. 取作业目标分钟数
+    const [uRows] = await pool.query<RowDataPacket[]>(
+      `SELECT homework_target_minutes FROM users WHERE user_id = ? LIMIT 1`,
       [childId],
     );
+    const targetMinutes = Number(uRows[0]?.homework_target_minutes) || 0;
 
-    const r = rows[0];
-    if (!r) return { rate: 0, targetDays: 0, totalDays: 0 };
+    // 2. 按日聚合作业时长，统计「当日合计 >= 目标」的天数；分母为本月已过天数
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS target_days, DAY(CURDATE()) AS total_days
+       FROM (
+         SELECT date
+         FROM time_records
+         WHERE user_id = ?
+           AND activity_type = 'homework'
+           AND YEAR(date) = YEAR(CURDATE())
+           AND MONTH(date) = MONTH(CURDATE())
+         GROUP BY date
+         HAVING SUM(duration_minutes) >= ?
+       ) AS reached_days`,
+      [childId, targetMinutes],
+    );
 
-    const targetDays = Number(r.target_days) || 0;
-    const totalDays = Number(r.total_days) || 0;
+    const targetDays = Number(rows[0]?.target_days) || 0;
+    const totalDays = Number(rows[0]?.total_days) || 0;
     const rate = totalDays > 0 ? Math.round((targetDays / totalDays) * 100) : 0;
 
     return { rate, targetDays, totalDays };
   }
 
   // 积分来源构成（环形图）
+  // task_complete 流水通过 source_id=task_id 关联 tasks → task_templates，
+  // 按任务类型细分为「固定每日/自选/挑战」三类；无模板或任务已删除的归入 taskType=null（前端兜底显示「任务完成」）
   async getPointsSource() {
     const childId = await this.getChildUserId();
     if (!childId) return [];
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT source_type, SUM(ABS(change_amount)) AS total
-       FROM point_logs
-       WHERE user_id = ?
-       GROUP BY source_type`,
+      `SELECT pl.source_type AS source_type,
+              tt.task_type AS task_type,
+              SUM(ABS(pl.change_amount)) AS total
+       FROM point_logs pl
+       LEFT JOIN tasks t
+         ON pl.source_type = 'task_complete' AND pl.source_id = t.task_id
+       LEFT JOIN task_templates tt
+         ON t.template_id = tt.template_id
+       WHERE pl.user_id = ?
+       GROUP BY pl.source_type, tt.task_type`,
       [childId],
     );
 
     return rows.map((r) => ({
       sourceType: r.source_type,
+      taskType: r.task_type ?? null,
       total: Number(r.total) || 0,
     }));
   }

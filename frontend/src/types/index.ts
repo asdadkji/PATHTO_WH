@@ -574,9 +574,11 @@ export interface HomeworkRate {
   totalDays: number
 }
 
-/** 积分来源构成项 */
+/** 积分来源构成项（task_complete 会按 taskType 细分为三种任务类型） */
 export interface PointsSourceItem {
   sourceType: string
+  /** 任务类型（仅 sourceType=task_complete 时有值；无模板/任务已删除为 null） */
+  taskType: string | null
   total: number
 }
 
@@ -584,6 +586,86 @@ export interface PointsSourceItem {
 export interface ProductCategoryDistItem {
   category: string
   count: number
+}
+
+// ============================================================
+// 管理后台：积分流水 + 手动调整
+// ============================================================
+
+/** 积分来源类型（与后端 point_logs.source_type enum 对齐） */
+export type PointSourceType =
+  | 'task_complete' | 'redemption' | 'admin_adjust'
+  | 'bonus' | 'penalty' | 'system'
+
+/** 积分流水列表项（管理端，含 userName） */
+export interface AdminPointLogItem {
+  logId: string
+  userId: string
+  userName: string
+  changeAmount: number
+  balanceAfter: number
+  sourceType: PointSourceType
+  sourceId: string | null
+  description: string | null
+  createdAt: string
+}
+
+/** 分页结果（与后端 Paginated<T> 对齐） */
+export interface Paginated<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+/** 积分流水列表响应 */
+export type AdminPointLogListResult = Paginated<AdminPointLogItem>
+
+/** 调整积分入参 */
+export interface AdjustPointsPayload {
+  userId: string
+  changeAmount: number
+  description?: string
+}
+
+/** 调整积分响应 */
+export interface AdjustPointsResult {
+  success: boolean
+  changeAmount: number
+  balanceAfter: number
+}
+
+// ============================================================
+// 管理后台：用户管理
+// ============================================================
+
+/** 管理端用户列表项 */
+export interface AdminUserItem {
+  userId: string
+  username: string
+  role: UserRole
+  totalPoints: number
+  status: UserStatus
+  homeworkTargetMinutes: number
+  gameTargetMinutes: number
+  createdAt: string
+}
+
+/** 重置密码入参 */
+export interface ResetPasswordPayload {
+  newPassword: string
+}
+
+/** 切换用户状态响应 */
+export interface ToggleUserStatusResult {
+  success: boolean
+  status: 'active' | 'inactive'
+}
+
+/** 更新用户目标入参 */
+export interface UpdateUserTargetsPayload {
+  homeworkTargetMinutes?: number
+  gameTargetMinutes?: number
 }
 
 // ============================================================

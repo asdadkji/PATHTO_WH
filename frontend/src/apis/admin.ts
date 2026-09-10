@@ -23,6 +23,13 @@ import type {
   HomeworkRate,
   PointsSourceItem,
   ProductCategoryDistItem,
+  AdminPointLogListResult,
+  AdjustPointsPayload,
+  AdjustPointsResult,
+  AdminUserItem,
+  ResetPasswordPayload,
+  ToggleUserStatusResult,
+  UpdateUserTargetsPayload,
 } from '@/types'
 
 /**
@@ -176,4 +183,52 @@ export function getProductCategoryDistribution() {
   return http.get(
     '/admin/dashboard/product-category',
   ) as unknown as Promise<ProductCategoryDistItem[]>
+}
+
+// ─── 积分流水 + 手动调整 ──────────────────────────────────────
+
+/** 积分流水列表：GET /api/admin/point-log/list，可选 userId 筛选 + 分页 */
+export function getAdminPointLogs(params?: {
+  userId?: string
+  page?: number
+  pageSize?: number
+}) {
+  return http.get('/admin/point-log/list', {
+    params: params ?? {},
+  }) as unknown as Promise<AdminPointLogListResult>
+}
+
+/** 手动调整积分：POST /api/admin/point/adjust */
+export function adjustUserPoints(data: AdjustPointsPayload) {
+  return http.post('/admin/point/adjust', data) as unknown as Promise<AdjustPointsResult>
+}
+
+// ─── 用户管理 ────────────────────────────────────────────────
+
+/** 用户列表：GET /api/admin/user/list */
+export function getAdminUsers() {
+  return http.get('/admin/user/list') as unknown as Promise<AdminUserItem[]>
+}
+
+/** 重置用户密码：PUT /api/admin/user/:id/password */
+export function resetUserPassword(id: string, data: ResetPasswordPayload) {
+  return http.put(
+    `/admin/user/${encodeURIComponent(id)}/password`,
+    data,
+  ) as unknown as Promise<{ success: boolean }>
+}
+
+/** 启用/停用账号：PUT /api/admin/user/:id/toggle */
+export function toggleUserStatus(id: string) {
+  return http.put(
+    `/admin/user/${encodeURIComponent(id)}/toggle`,
+  ) as unknown as Promise<ToggleUserStatusResult>
+}
+
+/** 调整作业/游戏目标：PUT /api/admin/user/:id/targets */
+export function updateUserTargets(id: string, data: UpdateUserTargetsPayload) {
+  return http.put(
+    `/admin/user/${encodeURIComponent(id)}/targets`,
+    data,
+  ) as unknown as Promise<{ success: boolean }>
 }

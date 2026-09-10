@@ -62,10 +62,12 @@ const TASK_TYPE_LABEL: Record<string, string> = {
   challenge: '挑战',
 }
 const SOURCE_LABEL: Record<string, string> = {
-  task: '任务完成',
+  task_complete: '任务完成',
   bonus: '连续打卡奖励',
-  admin: '管理员调整',
-  redemption: '兑换扣除',
+  admin_adjust: '管理员调整',
+  redemption: '兑换相关',
+  penalty: '扣分',
+  system: '系统',
 }
 
 // ─── KPI ─────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ const kpiCards = computed(() => {
     { label: '当前积分余额', value: d.currentBalance, unit: '分', color: '#42a5f5' },
     { label: '今日完成任务', value: d.todayCompletedTasks, unit: '个', color: '#66bb6a' },
     { label: '待审核兑换', value: d.pendingRedemptions, unit: '单', color: '#ffca28' },
-    { label: '今日完成率', value: Math.round(d.todayCompletionRate * 100), unit: '%', color: '#ab47bc' },
+    { label: '今日完成率', value: Math.round(d.todayCompletionRate), unit: '%', color: '#ab47bc' },
     { label: '本月积分流通', value: d.monthlyPointFlow, unit: '分', color: '#ec407a' },
   ]
 })
@@ -281,7 +283,8 @@ async function loadHomeworkRate() {
   homeworkRateLoading.value = true
   try {
     const d: HomeworkRate = await getHomeworkRate()
-    const pct = Math.round(d.rate * 100)
+    // 后端 rate 已是 0-100 的百分数（如 80 表示 80%），直接使用，切勿再 ×100
+    const pct = Math.min(100, Math.round(d.rate))
     homeworkRateOption.value = {
       series: [
         {
@@ -330,7 +333,7 @@ async function loadPointsSource() {
   try {
     const d: PointsSourceItem[] = await getPointsSource()
     pointsSourceOption.value = {
-      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      tooltip: { trigger: 'item', formatter: '{b}: {c}分 ({d}%)' },
       legend: { bottom: 0 },
       series: [
         {
@@ -340,7 +343,10 @@ async function loadPointsSource() {
           itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
           label: { show: true, formatter: '{b}\n{d}%' },
           data: d.map((item, i) => ({
-            name: SOURCE_LABEL[item.sourceType] || item.sourceType,
+            // 任务完成积分按任务类型细分（固定每日/自选/挑战）；其余来源用来源中文名
+            name: item.taskType
+              ? `${TASK_TYPE_LABEL[item.taskType] || '其他'}任务`
+              : SOURCE_LABEL[item.sourceType] || item.sourceType,
             value: item.total,
             itemStyle: { color: PALETTE[i % PALETTE.length] },
           })),
